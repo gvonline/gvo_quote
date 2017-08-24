@@ -16,15 +16,14 @@ type
     ButtonClear: TButton;
     TimerLoop: TTimer;
     LabelCity: TLabel;
-    RadioButtonEirene: TRadioButton;
-    RadioButtonPolaris: TRadioButton;
-    RadioButtonHelen: TRadioButton;
     ButtonWebsite: TButton;
+    ComboBoxServer: TComboBox;
     procedure FormCreate(Sender: TObject);
     procedure ButtonClearClick(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure TimerLoopTimer(Sender: TObject);
     procedure ButtonWebsiteClick(Sender: TObject);
+    procedure ComboBoxServerChange(Sender: TObject);
   const
     GameClassName = 'Greate Voyages Online Game MainFrame';
     TitleOffsetX = 113;
@@ -192,10 +191,12 @@ begin
   if Latest = '' then
   begin
     WriteLog('서버와 연결되지 않았습니다.');
+    ComboBoxServer.Enabled := False;
   end
   else if Latest <> Version then
   begin
     WriteLog('새 버전이 있습니다. 웹사이트에서 다운받으세요.');
+    ComboBoxServer.Enabled := False;
   end
   else
   begin
@@ -216,11 +217,20 @@ begin
   ShellExecute(0, 'open', 'http://gvonline.ga', nil, nil, SW_SHOWNORMAL);
 end;
 
+procedure TFormQuote.ComboBoxServerChange(Sender: TObject);
+begin
+  ComboBoxServer.Enabled := (ComboBoxServer.ItemIndex <= 0);
+  TimerLoop.Enabled := not ComboBoxServer.Enabled;
+end;
+
 procedure TFormQuote.ButtonClearClick(Sender: TObject);
 begin
   CurrentWindow := 0;
   WindowList.Clear;
   LabelCity.Caption := '';
+  ComboBoxServer.Enabled := True;
+  ComboBoxServer.ItemIndex := 0;
+  TimerLoop.Enabled := False;
   MemoLog.Lines.Clear;
 end;
 
@@ -459,7 +469,9 @@ begin
     end;
 
     if StartsStr('항구관리        ：', log) or
-      StartsStr('항구안내원      ：', log) then
+       StartsStr('항구안내원      ：', log) or
+       StartsStr('역장            ：', log) or
+       StartsStr('마부            ：', log) then
     begin
       status := '';
     end;
@@ -857,11 +869,11 @@ end;
 
 function TFormQuote.GetServer: String;
 begin
-  if RadioButtonEirene.Checked then
+  if ComboBoxServer.ItemIndex = 1 then
     Result := 'eirene'
-  else if RadioButtonPolaris.Checked then
+  else if ComboBoxServer.ItemIndex = 2 then
     Result := 'polaris'
-  else if RadioButtonHelen.Checked then
+  else if ComboBoxServer.ItemIndex = 3 then
     Result := 'helen'
   else
     Result := '';

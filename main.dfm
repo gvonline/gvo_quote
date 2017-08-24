@@ -21,8 +21,8 @@ object FormQuote: TFormQuote
   PixelsPerInch = 96
   TextHeight = 13
   object LabelCity: TLabel
-    Left = 8
-    Top = 270
+    Left = 135
+    Top = 267
     Width = 57
     Height = 18
     Anchors = [akLeft, akBottom]
@@ -36,9 +36,9 @@ object FormQuote: TFormQuote
   end
   object MemoLog: TMemo
     Left = 8
-    Top = 31
+    Top = 8
     Width = 484
-    Height = 230
+    Height = 253
     Anchors = [akLeft, akTop, akRight, akBottom]
     ReadOnly = True
     ScrollBars = ssVertical
@@ -54,46 +54,34 @@ object FormQuote: TFormQuote
     TabOrder = 1
     OnClick = ButtonClearClick
   end
-  object RadioButtonEirene: TRadioButton
-    Left = 8
-    Top = 8
-    Width = 113
-    Height = 17
-    Caption = #50640#51060#47112#45348
-    Checked = True
-    TabOrder = 2
-    TabStop = True
-  end
-  object RadioButtonPolaris: TRadioButton
-    Left = 127
-    Top = 8
-    Width = 113
-    Height = 17
-    BiDiMode = bdLeftToRight
-    Caption = #54260#46972#47532#49828
-    Enabled = False
-    ParentBiDiMode = False
-    TabOrder = 3
-  end
-  object RadioButtonHelen: TRadioButton
-    Left = 246
-    Top = 8
-    Width = 113
-    Height = 17
-    Caption = #54764#47112#45348
-    Enabled = False
-    TabOrder = 4
-  end
   object ButtonWebsite: TButton
     Left = 336
     Top = 267
     Width = 75
     Height = 25
     Caption = 'Website'
-    TabOrder = 5
+    TabOrder = 2
     OnClick = ButtonWebsiteClick
   end
+  object ComboBoxServer: TComboBox
+    Left = 8
+    Top = 267
+    Width = 121
+    Height = 21
+    Style = csDropDownList
+    Anchors = [akLeft, akBottom]
+    ItemIndex = 0
+    TabOrder = 3
+    Text = #49436#48260#47484' '#49440#53469#54616#49464#50836
+    OnChange = ComboBoxServerChange
+    Items.Strings = (
+      #49436#48260#47484' '#49440#53469#54616#49464#50836
+      #50640#51060#47112#45348
+      #54260#46972#47532#49828
+      #54764#47112#45348)
+  end
   object TimerLoop: TTimer
+    Enabled = False
     Interval = 250
     OnTimer = TimerLoopTimer
     Left = 16
