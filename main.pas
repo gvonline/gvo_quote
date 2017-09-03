@@ -495,6 +495,7 @@ var
   State: TGameState;
   centerX, centerY, pointX, pointY, limitY, Selected, item, X, Status: Integer;
   Title, Name, Quote, StatusString: String;
+  QuoteNum: Integer;
   TopLine, BottomLine, ArrowLine: PRGBTriple;
   TopColor, BottomColor, LineColor: TColor;
   r, g, b: Byte;
@@ -574,34 +575,48 @@ begin
     end;
 
     Quote := Trim(GetText(bmp, pointX + 169, pointY + 26, 80, GetWhitePoints));
-    if Quote = '' then
+    if (Length(Quote) < 4) or (Quote[1] <> '(') or
+      (Copy(Quote, Length(Quote) - 1, 2) <> 'ге)') then
     begin
       inc(pointY);
       continue;
     end;
 
-    Quote := Copy(Quote, 2, Length(Quote) - 3);
-    if Length(Quote) > 3 then
+    Quote := Trim(Copy(Quote, 2, Length(Quote) - 3));
+    if not TryStrToInt(Quote, QuoteNum) then
     begin
       inc(pointY);
       continue;
     end;
 
     ArrowLine := bmp.ScanLine[pointY + 33];
-    if ArrowLine[pointX + 237].rgbtRed > 200 then
+    if ((ArrowLine[pointX + 237].rgbtRed shr 2) = (238 shr 2)) and
+      ((ArrowLine[pointX + 237].rgbtGreen shr 2) = (136 shr 2)) and
+      ((ArrowLine[pointX + 237].rgbtBlue shr 2) = (34 shr 2)) then
     begin
       Status := 1;
       StatusString := 'бу';
     end
-    else if ArrowLine[pointX + 237].rgbtBlue < 200 then
+    else
+    if ((ArrowLine[pointX + 237].rgbtRed shr 2) = (170 shr 2)) and
+      ((ArrowLine[pointX + 237].rgbtGreen shr 2) = (238 shr 2)) and
+      ((ArrowLine[pointX + 237].rgbtBlue shr 2) = (34 shr 2)) then
     begin
       Status := 0;
       StatusString := '';
     end
     else
+    if ((ArrowLine[pointX + 237].rgbtRed shr 2) = (17 shr 2)) and
+      ((ArrowLine[pointX + 237].rgbtGreen shr 2) = (238 shr 2)) and
+      ((ArrowLine[pointX + 237].rgbtBlue shr 2) = (204 shr 2)) then
     begin
       Status := -1;
       StatusString := 'бх';
+    end
+    else
+    begin
+      inc(pointY);
+      continue;
     end;
 
     if BottomLine[pointX + 48].rgbtGreen > 150 then
@@ -615,7 +630,7 @@ begin
       //WriteLog('Selected: ' + Name);
     end;
 
-    if State.UpdateItem(State.CityName, Name, StrToInt(Quote), Status) then
+    if State.UpdateItem(State.CityName, Name, QuoteNum, Status) then
     begin
       //WriteLog(Format('Goods %d: %s %s %s %d (Selected: %d)', [pointY, State.CityName, Name, Quote, Status, Selected]));
       WriteLog(Format('%s :: %s (%s%%) %s', [State.CityName, Name, Quote, StatusString]));
@@ -686,35 +701,48 @@ begin
     end;
 
     Quote := Trim(GetText(bmp, pointX + 169, pointY + item * 56 + 26, 80, GetWhitePoints));
-    if Quote = '' then
+    if (Length(Quote) < 4) or (Quote[1] <> '(') or
+      (Copy(Quote, Length(Quote) - 1, 2) <> 'ге)') then
     begin
       continue;
     end;
 
-    Quote := Copy(Quote, 2, Length(Quote) - 3);
-    if Length(Quote) > 3 then
+    Quote := Trim(Copy(Quote, 2, Length(Quote) - 3));
+    if not TryStrToInt(Quote, QuoteNum) then
     begin
       continue;
     end;
 
     ArrowLine := bmp.ScanLine[pointY + item * 56 + 33];
-    if ArrowLine[pointX + 237].rgbtRed > 200 then
+    if ((ArrowLine[pointX + 237].rgbtRed shr 2) = (238 shr 2)) and
+      ((ArrowLine[pointX + 237].rgbtGreen shr 2) = (136 shr 2)) and
+      ((ArrowLine[pointX + 237].rgbtBlue shr 2) = (34 shr 2)) then
     begin
       Status := 1;
       StatusString := 'бу';
     end
-    else if ArrowLine[pointX + 237].rgbtBlue < 200 then
+    else
+    if ((ArrowLine[pointX + 237].rgbtRed shr 2) = (170 shr 2)) and
+      ((ArrowLine[pointX + 237].rgbtGreen shr 2) = (238 shr 2)) and
+      ((ArrowLine[pointX + 237].rgbtBlue shr 2) = (34 shr 2)) then
     begin
       Status := 0;
       StatusString := '';
     end
     else
+    if ((ArrowLine[pointX + 237].rgbtRed shr 2) = (17 shr 2)) and
+      ((ArrowLine[pointX + 237].rgbtGreen shr 2) = (238 shr 2)) and
+      ((ArrowLine[pointX + 237].rgbtBlue shr 2) = (204 shr 2)) then
     begin
       Status := -1;
       StatusString := 'бх';
+    end
+    else
+    begin
+      continue;
     end;
 
-    if State.UpdateItem(Name, State.Selected, StrToInt(Quote), Status) then
+    if State.UpdateItem(Name, State.Selected, QuoteNum, Status) then
     begin
       //WriteLog(Format('Goods %d: %s %s %s %d (Selected: %d)', [item, Name, State.Selected, Quote, Status, Selected]));
       WriteLog(Format('%s :: %s (%s%%) %s', [Name, State.Selected, Quote, StatusString]));
