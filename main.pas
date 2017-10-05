@@ -132,6 +132,22 @@ begin
   result := result shl 1;
 end;
 
+function ComparePixelColor(bmp: TBitmap; X, Y: Integer; R, G, B: Byte): Bool;
+var
+  chkR, chkG, chkB, count: Integer;
+  Line: PRGBTriple;
+begin
+  result := False;
+  Line := bmp.ScanLine[Y];
+  if ABS(Integer(Line[X].rgbtRed) - R) > 8 then
+    exit;
+  if ABS(Integer(Line[X].rgbtGreen) - G) > 8 then
+    exit;
+  if ABS(Integer(Line[X].rgbtBlue) - B) > 8 then
+    exit;
+  result := True;
+end;
+
 function WordToBinStr(value: Word): String;
 var
   length: Integer;
@@ -496,7 +512,7 @@ var
   centerX, centerY, pointX, pointY, limitY, Selected, item, X, Status: Integer;
   Title, Name, Quote, StatusString: String;
   QuoteNum: Integer;
-  TopLine, BottomLine, ArrowLine: PRGBTriple;
+  TopLine, BottomLine: PRGBTriple;
   TopColor, BottomColor, LineColor: TColor;
   r, g, b: Byte;
   match: Bool;
@@ -568,6 +584,17 @@ begin
     end;
 
     Name := Trim(GetText(bmp, pointX + 52, pointY + 6, 180, GetWhitePoints));
+    if Name = '호박' then
+    begin
+      if ComparePixelColor(bmp, pointX + 16, pointY + 16, 221, 221, 221) then
+        Name := '호박(보석)'
+      else
+      if ComparePixelColor(bmp, pointX + 16, pointY + 16, 187, 119, 0) then
+        Name := '호박(식료품)'
+      else
+        Name := '';
+    end;
+
     if Name = '' then
     begin
       inc(pointY);
@@ -589,26 +616,19 @@ begin
       continue;
     end;
 
-    ArrowLine := bmp.ScanLine[pointY + 33];
-    if ((ArrowLine[pointX + 237].rgbtRed shr 2) = (238 shr 2)) and
-      ((ArrowLine[pointX + 237].rgbtGreen shr 2) = (136 shr 2)) and
-      ((ArrowLine[pointX + 237].rgbtBlue shr 2) = (34 shr 2)) then
+    if ComparePixelColor(bmp, pointX + 237, pointY + 33, 238, 136, 34) then
     begin
       Status := 1;
       StatusString := '▲';
     end
     else
-    if ((ArrowLine[pointX + 237].rgbtRed shr 2) = (170 shr 2)) and
-      ((ArrowLine[pointX + 237].rgbtGreen shr 2) = (238 shr 2)) and
-      ((ArrowLine[pointX + 237].rgbtBlue shr 2) = (34 shr 2)) then
+    if ComparePixelColor(bmp, pointX + 237, pointY + 33, 170, 238, 34) then
     begin
       Status := 0;
       StatusString := '';
     end
     else
-    if ((ArrowLine[pointX + 237].rgbtRed shr 2) = (17 shr 2)) and
-      ((ArrowLine[pointX + 237].rgbtGreen shr 2) = (238 shr 2)) and
-      ((ArrowLine[pointX + 237].rgbtBlue shr 2) = (204 shr 2)) then
+    if ComparePixelColor(bmp, pointX + 237, pointY + 33, 17, 238, 204) then
     begin
       Status := -1;
       StatusString := '▼';
@@ -713,26 +733,19 @@ begin
       continue;
     end;
 
-    ArrowLine := bmp.ScanLine[pointY + item * 56 + 33];
-    if ((ArrowLine[pointX + 237].rgbtRed shr 2) = (238 shr 2)) and
-      ((ArrowLine[pointX + 237].rgbtGreen shr 2) = (136 shr 2)) and
-      ((ArrowLine[pointX + 237].rgbtBlue shr 2) = (34 shr 2)) then
+    if ComparePixelColor(bmp, pointX + 237, (pointY + item * 56 + 33), 238, 136, 34) then
     begin
       Status := 1;
       StatusString := '▲';
     end
     else
-    if ((ArrowLine[pointX + 237].rgbtRed shr 2) = (170 shr 2)) and
-      ((ArrowLine[pointX + 237].rgbtGreen shr 2) = (238 shr 2)) and
-      ((ArrowLine[pointX + 237].rgbtBlue shr 2) = (34 shr 2)) then
+    if ComparePixelColor(bmp, pointX + 237, (pointY + item * 56 + 33), 170, 238, 34) then
     begin
       Status := 0;
       StatusString := '';
     end
     else
-    if ((ArrowLine[pointX + 237].rgbtRed shr 2) = (17 shr 2)) and
-      ((ArrowLine[pointX + 237].rgbtGreen shr 2) = (238 shr 2)) and
-      ((ArrowLine[pointX + 237].rgbtBlue shr 2) = (204 shr 2)) then
+    if ComparePixelColor(bmp, pointX + 237, (pointY + item * 56 + 33), 17, 238, 204) then
     begin
       Status := -1;
       StatusString := '▼';
