@@ -10,6 +10,7 @@ type
   const
     URL = 'http://quote.gvonline.ga';
     VersionURL = 'http://quote.gvonline.ga/latest';
+    SearchURL = 'http://quote.gvonline.ga/search.php';
   private
     Params: TStringList;
     Lock: TCriticalSection;
@@ -23,6 +24,7 @@ type
     procedure SendCityInfo(Server, CityName, CityStatus: String);
     procedure SendItemInfo(Server, CityName, ItemName, ItemQuote, ItemStatus: String);
     function GetVersion: String;
+    function GetSearchResult(Server, CityNames, ItemNames: String): String;
   end;
 
 implementation
@@ -117,6 +119,23 @@ begin
   else
     Result := '';
   Text.Free;
+end;
+
+function TRequest.GetSearchResult(Server, CityNames, ItemNames: String): String;
+var
+  Param: String;
+  Response: TMemoryStream;
+  Text: AnsiString;
+begin
+  Param := 'server=' + EncodeURLElement(UTF8Encode(Server));
+  Param := Param + '&city=' + EncodeURLElement(UTF8Encode(CityNames));
+  Param := Param + '&item=' + EncodeURLElement(UTF8Encode(ItemNames));
+
+  Response := TMemoryStream.Create;
+  if HttpPostURL(SearchURL, Param, Response) and (Response.Size > 0) then
+    SetString(Text, PAnsiChar(Response.Memory), Response.Size);
+  Result := UTF8toString(Text);
+  Response.Free;
 end;
 
 end.

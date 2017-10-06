@@ -3,10 +3,10 @@ unit main;
 interface
 
 uses
-  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
-  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ExtCtrls,
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, System.JSON,
+  Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ExtCtrls,
   Generics.Collections,
-  GameState, Request;
+  GameState, Request, Vcl.ComCtrls;
 
 type
   TPixelsFunc = function(bitmap: TBitmap; X, Y: Integer): Word;
@@ -18,12 +18,27 @@ type
     LabelCity: TLabel;
     ButtonWebsite: TButton;
     ComboBoxServer: TComboBox;
+    PageControl1: TPageControl;
+    TabSheet1: TTabSheet;
+    TabSheet2: TTabSheet;
+    ListViewSearch: TListView;
+    EditCities: TEdit;
+    EditGoods: TEdit;
+    ButtonSearch: TButton;
+    LabelCities: TLabel;
+    LabelGoods: TLabel;
+    ButtonReset: TButton;
     procedure FormCreate(Sender: TObject);
     procedure ButtonClearClick(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure TimerLoopTimer(Sender: TObject);
     procedure ButtonWebsiteClick(Sender: TObject);
     procedure ComboBoxServerChange(Sender: TObject);
+    procedure ButtonSearchClick(Sender: TObject);
+    procedure ListViewSearchColumnClick(Sender: TObject; Column: TListColumn);
+    procedure ListViewSearchCompare(Sender: TObject; Item1, Item2: TListItem; Data: Integer; var Compare: Integer);
+    procedure ListViewSearchDblClick(Sender: TObject);
+    procedure ButtonResetClick(Sender: TObject);
   const
     GameClassName = 'Greate Voyages Online Game MainFrame';
     TitleOffsetX = 113;
@@ -49,6 +64,10 @@ type
     CityNames: TStringList;
     CurrentWindow: HWND;
     Delay: Integer;
+    ColumnSortIndex: Integer;
+    ColumnSortWas: Integer;
+    ColumnSortAscending: Boolean;
+    ColumnType: Integer;
     procedure LoadFont;
     procedure FindCityName(bmp: TBitmap);
     procedure FindChatMessage(bmp: TBitmap);
@@ -57,6 +76,11 @@ type
     function FindFlagImage(bmp: TBitmap): Integer;
     function GetText(bmp: TBitmap; X, Y, Width: Integer; PixelsFunc: TPixelsFunc): String;
     function GetServer: String;
+    function NaturalOrderCompareString(const A1, A2: string; ACaseSensitive: Boolean): Integer;
+    function GetPassedTimeString(const PassedTime: Int64): String;
+    function GetQuoteStatusString(const QuoteStatus: Int8): String;
+    function GetResistStatusString(const ResistStatus: Int8): String;
+
   public
     { Public declarations }
   end;
@@ -70,7 +94,7 @@ implementation
 {$POINTERMATH ON}
 
 uses
-  Math, StrUtils, ShellApi;
+  Math, StrUtils, ShellApi, DateUtils;
 
 function GetWhitePoints(bmp: TBitmap; fromX, fromY: Integer): Word;
 var
@@ -206,17 +230,26 @@ begin
   Latest := Request.GetVersion;
   if Latest = '' then
   begin
-    WriteLog('서버와 연결되지 않았습니다.');
+    MemoLog.Lines.Add('');
+    MemoLog.Lines.Add('      서버와 연결되지 않았습니다.');
+    MemoLog.Lines.Add('');
     ComboBoxServer.Enabled := False;
   end
   else if Latest <> Version then
   begin
-    WriteLog('새 버전이 있습니다. 웹사이트에서 다운받으세요.');
+    MemoLog.Lines.Add('');
+    MemoLog.Lines.Add('      새 버전이 있습니다.');
+    MemoLog.Lines.Add('      웹사이트에서 다운받으세요.');
+    MemoLog.Lines.Add('');
     ComboBoxServer.Enabled := False;
+    ButtonClear.Enabled := False;
   end
   else
   begin
-    WriteLog('환영합니다. 자세한 내용은 웹사이트를 확인하세요.');
+    MemoLog.Lines.Add('');
+    MemoLog.Lines.Add('      환영합니다.');
+    MemoLog.Lines.Add('      자세한 내용은 웹사이트를 확인하세요.');
+    MemoLog.Lines.Add('');
   end;
 end;
 
@@ -228,6 +261,123 @@ begin
   Request.Terminate;
 end;
 
+procedure TFormQuote.ButtonResetClick(Sender: TObject);
+var
+  i: Integer;
+begin
+  EditCities.Text := '';
+  EditGoods.Text := '';
+  ListViewSearch.Clear;
+  if ListViewSearch.Columns.Count > 0 then
+  begin
+    for i := ListViewSearch.Columns.Count - 1 downto 0 do
+      ListViewSearch.Column[i].Destroy;
+  end;
+end;
+
+procedure TFormQuote.ButtonSearchClick(Sender: TObject);
+const
+  ColumnNamesForDashboard: array[0..3] of String = ('도시명', '등록건수', '도시상태', '갱신시간');
+  ColumnWidthForDashboard: array[0..3] of Integer = (80, 60, 150, 120);
+  ColumnNamesForCommon: array[0..8] of String = ('품명', '품목', '시세', '시세상태', '시세갱신시간', '도시명', '내성항', '도시상태', '상태갱신시간');
+  ColumnWidthForCommon: array[0..8] of Integer = (80, 80, 40, 60, 120, 80, 60, 150, 120);
+var
+  i, j, ColumnCount: Integer;
+  JSONString, JSONPath, Text: String;
+  JSONArray: TJSONArray;
+  JSONRow: TJSONObject;
+  ColumnNames: Tarray<String>;
+  ColumnWidth: Tarray<Integer>;
+begin
+  ColumnType := -1;
+  ColumnSortWas := -1;
+  ColumnCount := 0;
+  JSONString := Request.GetSearchResult(GetServer, EditCities.Text, EditGoods.Text);
+  JSONArray := TJSONObject.ParseJSONValue(JSONString) as TJSONArray;
+  for i := 0 to JSONArray.size - 1 do
+  begin
+    JSONRow := JSONArray.Get(i) as TJSONObject;
+    ColumnCount := JSONRow.Count;
+    SetLength(ColumnNames, ColumnCount);
+    SetLength(ColumnWidth, ColumnCount);
+    if ColumnCount = Length(ColumnNamesForCommon) then
+    begin
+      for j := 0 to ColumnCount -1 do
+      begin
+        ColumnType := 0;
+        ColumnNames[j] := ColumnNamesForCommon[j];
+        ColumnWidth[j] := ColumnWidthForCommon[j];
+      end;
+    end
+    else
+    begin
+      for j := 0 to ColumnCount -1 do
+      begin
+        ColumnType := 1;
+        ColumnNames[j] := ColumnNamesForDashboard[j];
+        ColumnWidth[j] := ColumnWidthForDashboard[j];
+      end;
+    end;
+    break;
+  end;
+
+  ListViewSearch.Clear;
+  if ListViewSearch.Columns.Count > 0 then
+  begin
+    for i := ListViewSearch.Columns.Count - 1 downto 0 do
+      ListViewSearch.Column[i].Destroy;
+  end;
+
+  if ColumnCount = 0 then
+    exit;
+
+  for i := 0 to ColumnCount - 1 do
+  begin
+    ListViewSearch.Columns.Add.Caption := ColumnNames[i];
+    ListViewSearch.Columns.Items[i].Width := ColumnWidth[i];
+  end;
+
+  for i := 0 to JSONArray.size - 1 do
+  begin
+    with ListViewSearch.Items.Add do
+    begin
+      for j := 0 to ColumnCount - 1 do
+      begin
+        JSONPath := Format('[%d].%s', [i, ColumnNames[j]]);
+        Text := JSONArray.GetValue<String>(JSONPath);
+
+        if EndsStr('갱신시간', ColumnNames[j]) then
+        begin
+          if Text = '0' then
+            Text := ''
+          else if Text <> '' then
+            Text := GetPassedTimeString(StrToInt(Text));
+        end
+        else if '시세상태' = ColumnNames[j] then
+        begin
+          if Text <> '' then
+            Text := GetQuoteStatusString(StrToInt(Text));
+        end
+        else if '내성항' = ColumnNames[j] then
+        begin
+          if Text <> '' then
+            Text := GetResistStatusString(StrToInt(Text));
+        end;
+
+        if j = 0 then
+          Caption := Text
+        else
+          SubItems.Add(Text);
+      end;
+      for j := 0 to ColumnCount - 1 do
+      begin
+        JSONPath := Format('[%d].%s', [i, ColumnNames[j]]);
+        SubItems.Add(JSONArray.GetValue<String>(JSONPath));
+      end;
+    end;
+  end;
+end;
+
 procedure TFormQuote.ButtonWebsiteClick(Sender: TObject);
 begin
   ShellExecute(0, 'open', 'http://gvonline.ga', nil, nil, SW_SHOWNORMAL);
@@ -236,6 +386,8 @@ end;
 procedure TFormQuote.ComboBoxServerChange(Sender: TObject);
 begin
   ComboBoxServer.Enabled := (ComboBoxServer.ItemIndex <= 0);
+  ButtonSearch.Enabled := not ComboBoxServer.Enabled;
+  ButtonReset.Enabled := ButtonSearch.Enabled;
   TimerLoop.Enabled := not ComboBoxServer.Enabled;
 end;
 
@@ -245,9 +397,15 @@ begin
   WindowList.Clear;
   LabelCity.Caption := '';
   ComboBoxServer.Enabled := True;
+  ButtonSearch.Enabled := not ComboBoxServer.Enabled;
+  ButtonReset.Enabled := ButtonSearch.Enabled;
   ComboBoxServer.ItemIndex := 0;
   TimerLoop.Enabled := False;
   MemoLog.Lines.Clear;
+  MemoLog.Lines.Add('');
+  MemoLog.Lines.Add('      프로그램 동작을 일시적으로 중지 하였습니다.');
+  MemoLog.Lines.Add('      서버를 선택 하여 주십시오.');
+  MemoLog.Lines.Add('');
 end;
 
 procedure TFormQuote.TimerLoopTimer(Sender: TObject);
@@ -315,6 +473,55 @@ begin
 
   Bmp.Free;
   TimerLoop.Enabled := True;
+end;
+
+procedure TFormQuote.ListViewSearchColumnClick(Sender: TObject; Column: TListColumn);
+begin
+  ColumnSortIndex := Column.Index + ListViewSearch.Columns.Count;
+
+  if ColumnSortWas = ColumnSortIndex then
+    ColumnSortAscending := not ColumnSortAscending
+  else
+    ColumnSortAscending := False;
+
+  ColumnSortWas := ColumnSortIndex;
+  (Sender as TCustomListView).AlphaSort;
+end;
+
+procedure TFormQuote.ListViewSearchCompare(Sender: TObject; Item1, Item2: TListItem; Data: Integer; var Compare: Integer);
+var
+  i: Integer;
+begin
+  if ColumnSortIndex > 0 then
+  begin
+    i := ColumnSortIndex - 1;
+    Compare := NaturalOrderCompareString(Item1.SubItems[i], Item2.SubItems[i], True);
+  end
+  else
+  begin
+    Compare := NaturalOrderCompareString(Item1.Caption, Item2.Caption, True);
+  end;
+
+  if not ColumnSortAscending then
+    Compare := -Compare;
+end;
+
+procedure TFormQuote.ListViewSearchDblClick(Sender: TObject);
+begin
+  if ListViewSearch.Selected <> nil then
+    begin
+    if ColumnType = 1 then
+    begin
+      EditCities.Text := ListViewSearch.Selected.Caption;
+      EditGoods.Text := '';
+    end
+    else if ColumnType = 0 then
+    begin
+      EditCities.Text := '';
+      EditGoods.Text := ListViewSearch.Selected.Caption
+    end;
+    ButtonSearchClick(nil);
+  end;
 end;
 
 { PRIVATE }
@@ -918,6 +1125,135 @@ begin
     Result := 'helen'
   else
     Result := '';
+end;
+
+function TFormQuote.GetPassedTimeString(const PassedTime: Int64): String;
+begin
+  Result := '';
+  if PassedTime <= 0 then
+    exit
+  else if PassedTime < 60 then
+    Result := Format('%d초 전', [PassedTime])
+  else if PassedTime < 3600 then
+    Result := Format('%d분 %d초 전', [Floor(PassedTime div 60), PassedTime mod 60])
+  else
+    Result := Format('%d시간 전', [Floor(PassedTime div 3600)]);
+end;
+
+function TFormQuote.GetQuoteStatusString(const QuoteStatus: Int8): String;
+begin
+  Result := '';
+  if QuoteStatus > 0 then
+    Result := '▲'
+  else if QuoteStatus < 0 then
+    Result := '▼';
+end;
+
+function TFormQuote.GetResistStatusString(const ResistStatus: Int8): String;
+begin
+  Result := '';
+  if ResistStatus = 1 then
+    Result := '★';
+end;
+
+// http://yypbd.tistory.com/590
+function TFormQuote.NaturalOrderCompareString(const A1, A2: string; ACaseSensitive: Boolean): Integer;
+var
+  Str1, Str2: PChar;
+  Pos1, Pos2: Integer;
+  EndPos1, EndPos2: Integer;
+begin
+  Str1 := PChar(A1);
+  Str2 := PChar(A2);
+
+  Pos1 := -1;
+  Pos2 := -1;
+
+  while True do
+  begin
+    Inc( Pos1 );
+    Inc( Pos2 );
+
+    if (Str1[Pos1] = #0) and (Str2[Pos2] = #0) then
+    begin
+      Result := 0;
+      Exit;
+    end
+    else if Str1[Pos1] = #0 then
+    begin
+      Result := -1;
+      Exit;
+    end
+    else if Str2[Pos2] = #0 then
+    begin
+      Result := 1;
+      Exit;
+    end;
+
+    if (Str1[Pos1] >= '0') and (Str1[Pos1] <= '9') and
+       (Str2[Pos2] >= '0') and (Str2[Pos2] <= '9') then
+    begin
+      EndPos1 := Pos1;
+      repeat
+        Inc(EndPos1);
+      until not ((Str1[EndPos1] >= '0') and (Str1[EndPos1] <= '9'));
+
+      EndPos2 := Pos2;
+      repeat
+        Inc(EndPos2);
+      until not ((Str2[EndPos2] >= '0') and (Str2[EndPos2] <= '9'));
+
+      while True do
+      begin
+        if EndPos1 - Pos1 = EndPos2 - Pos2 then
+        begin
+          // 이부분이 숫자비교임. StrToInt 한 다음에 빼도 될 것임
+          Result := CompareStr( Copy(Str1, Pos1+1, EndPos1 - Pos1),  Copy(Str2, Pos2+1, EndPos1 - Pos1) ) ;
+
+          if Result = 0 then
+          begin
+            Pos1 := EndPos1 - 1;
+            Pos2 := EndPos2 - 1;
+            Break;
+          end
+          else
+          begin
+            Exit;
+          end;
+        end
+        else if EndPos1 - Pos1 > EndPos2 - Pos2 then
+        begin
+          if Str1[Pos1] = '0' then
+            Inc(Pos1)
+          else
+          begin
+            Result := 1;
+            Exit;
+          end;
+        end
+        else
+        begin
+          if Str2[Pos2] = '0' then
+            Inc( Pos2 )
+          else
+          begin
+            Result := -1;
+            Exit;
+          end;
+        end;
+      end;
+    end
+    else
+    begin
+      if ACaseSensitive then
+        Result := CompareStr( Copy(Str1, Pos1, 1), Copy(Str2, Pos2, 1) )
+      else
+        Result := CompareText( Copy(Str1, Pos1, 1), Copy(Str2, Pos2, 1) );
+
+      if Result <> 0 then
+        Exit;
+    end;
+  end;
 end;
 
 end.
