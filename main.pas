@@ -856,13 +856,7 @@ begin
       if ComparePixelColor(bmp, pointX + 16, pointY + 16, 221, 221, 221) then
         Name := '호박(보석)'
       else
-      if ComparePixelColor(bmp, pointX + 16, pointY + 16, 187, 119, 0) then
-        Name := '호박(식료품)'
-      else
-      begin
-        Name := '';
-        WriteLogForColor(bmp, pointX, 16, pointY, 16);
-      end;
+        Name := '호박(식료품)';
     end;
 
     if Name = '' then
