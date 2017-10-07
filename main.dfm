@@ -45,8 +45,6 @@ object FormQuote: TFormQuote
     Caption = 'Clear'
     TabOrder = 0
     OnClick = ButtonClearClick
-    ExplicitLeft = 417
-    ExplicitTop = 367
   end
   object ButtonWebsite: TButton
     Left = 328
@@ -57,8 +55,6 @@ object FormQuote: TFormQuote
     Caption = 'Website'
     TabOrder = 1
     OnClick = ButtonWebsiteClick
-    ExplicitLeft = 336
-    ExplicitTop = 367
   end
   object ComboBoxServer: TComboBox
     Left = 8
@@ -76,7 +72,6 @@ object FormQuote: TFormQuote
       #50640#51060#47112#45348
       #54260#46972#47532#49828
       #54764#47112#45348)
-    ExplicitTop = 367
   end
   object PageControl1: TPageControl
     Left = 8
@@ -86,12 +81,8 @@ object FormQuote: TFormQuote
     ActivePage = TabSheet1
     Anchors = [akLeft, akTop, akRight, akBottom]
     TabOrder = 3
-    ExplicitWidth = 484
-    ExplicitHeight = 353
     object TabSheet1: TTabSheet
       Caption = #49688#51665#44592
-      ExplicitWidth = 476
-      ExplicitHeight = 325
       DesignSize = (
         468
         298)
@@ -104,15 +95,15 @@ object FormQuote: TFormQuote
         ReadOnly = True
         ScrollBars = ssVertical
         TabOrder = 0
-        ExplicitWidth = 470
-        ExplicitHeight = 319
       end
     end
     object TabSheet2: TTabSheet
       Caption = #44160#49353
       ImageIndex = 1
-      ExplicitWidth = 474
-      ExplicitHeight = 323
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
       DesignSize = (
         468
         298)
@@ -149,7 +140,6 @@ object FormQuote: TFormQuote
         Height = 21
         Anchors = [akLeft, akTop, akRight]
         TabOrder = 1
-        ExplicitWidth = 338
       end
       object EditGoods: TEdit
         Left = 54
@@ -166,6 +156,8 @@ object FormQuote: TFormQuote
         Height = 232
         Anchors = [akLeft, akTop, akRight, akBottom]
         Columns = <>
+        ReadOnly = True
+        RowSelect = True
         TabOrder = 3
         ViewStyle = vsReport
         OnColumnClick = ListViewSearchColumnClick

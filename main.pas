@@ -73,6 +73,7 @@ type
     procedure FindChatMessage(bmp: TBitmap);
     procedure FindTrade(bmp: TBitmap);
     procedure WriteLog(msg: String);
+    procedure WriteLogForColor(Bmp: TBitmap; pointX, increaseX, pointY, increaseY: Integer);
     function FindFlagImage(bmp: TBitmap): Integer;
     function GetText(bmp: TBitmap; X, Y, Width: Integer; PixelsFunc: TPixelsFunc): String;
     function GetServer: String;
@@ -94,7 +95,7 @@ implementation
 {$POINTERMATH ON}
 
 uses
-  Math, StrUtils, ShellApi, DateUtils;
+  Math, StrUtils, ShellApi, DateUtils, TypInfo;
 
 function GetWhitePoints(bmp: TBitmap; fromX, fromY: Integer): Word;
 var
@@ -278,9 +279,9 @@ end;
 procedure TFormQuote.ButtonSearchClick(Sender: TObject);
 const
   ColumnNamesForDashboard: array[0..3] of String = ('도시명', '등록건수', '도시상태', '갱신시간');
-  ColumnWidthForDashboard: array[0..3] of Integer = (80, 60, 150, 120);
+  ColumnWidthForDashboard: array[0..3] of Integer = (    120,         60,        160,        100);
   ColumnNamesForCommon: array[0..8] of String = ('품명', '품목', '시세', '시세상태', '시세갱신시간', '도시명', '내성항', '도시상태', '상태갱신시간');
-  ColumnWidthForCommon: array[0..8] of Integer = (80, 80, 40, 60, 120, 80, 60, 150, 120);
+  ColumnWidthForCommon: array[0..8] of Integer = (   80,     50,     40,         60,            100,      100,       50,        150,            120);
 var
   i, j, ColumnCount: Integer;
   JSONString, JSONPath, Text: String;
@@ -289,7 +290,7 @@ var
   ColumnNames: Tarray<String>;
   ColumnWidth: Tarray<Integer>;
 begin
-  ColumnType := -1;
+  ColumnType := 0;
   ColumnSortWas := -1;
   ColumnCount := 0;
   JSONString := Request.GetSearchResult(GetServer, EditCities.Text, EditGoods.Text);
@@ -304,7 +305,7 @@ begin
     begin
       for j := 0 to ColumnCount -1 do
       begin
-        ColumnType := 0;
+        ColumnType := 1;
         ColumnNames[j] := ColumnNamesForCommon[j];
         ColumnWidth[j] := ColumnWidthForCommon[j];
       end;
@@ -313,7 +314,7 @@ begin
     begin
       for j := 0 to ColumnCount -1 do
       begin
-        ColumnType := 1;
+        ColumnType := 2;
         ColumnNames[j] := ColumnNamesForDashboard[j];
         ColumnWidth[j] := ColumnWidthForDashboard[j];
       end;
@@ -507,21 +508,80 @@ begin
 end;
 
 procedure TFormQuote.ListViewSearchDblClick(Sender: TObject);
+var
+  HitTests: THitTests;
+  HitTest: THitTest;
+  Text, Temp: String;
+  SubItems: TArray<String>;
+  i, ColumnX, ClickX : Integer;
+  ListViewCursosPos: TPoint;
+  SelectedItem: TListItem;
+  ScrollInfo: TScrollInfo;
 begin
-  if ListViewSearch.Selected <> nil then
+  if ColumnType = 0 then
+    exit;
+
+  SelectedItem := ListViewSearch.Selected;
+  if SelectedItem = nil then
+    exit;
+
+  ListViewCursosPos := ListViewSearch.ScreenToClient(Mouse.CursorPos);
+  HitTests := ListViewSearch.GetHitTestInfoAt(ListViewCursosPos.X, ListViewCursosPos.Y);
+
+  {
+  Text := '';
+  for HitTest in HitTests do
+  begin
+    Temp := GetEnumName(TypeInfo(THitTest), Integer(HitTest));
+    Text := Format('%s %s | ', [Text, Temp]);
+  end;
+  WriteLog(Format('[%d, %d] %s', [ListViewCursosPos.X, ListViewCursosPos.Y, Text]));
+  }
+
+  if HitTests <= [htOnIcon, htOnItem, htOnLabel, htOnStateIcon] then
+  begin
+    Text := SelectedItem.Caption;
+    SubItems := SelectedItem.SubItems.ToStringArray;
+  end
+  else
+    exit;
+
+  ScrollInfo.cbSize := SizeOf(ScrollInfo);
+  ScrollInfo.fMask := SIF_ALL;
+  GetScrollInfo(ListViewSearch.Handle, SBS_HORZ, ScrollInfo);
+  ClickX := ListViewCursosPos.X + ScrollInfo.nPos;
+
+  i := 0;
+  ColumnX := 0;
+  if ColumnType = 1 then
+  begin
+    for i := 0 to ListViewSearch.Columns.Count - 1 do
     begin
-    if ColumnType = 1 then
-    begin
-      EditCities.Text := ListViewSearch.Selected.Caption;
-      EditGoods.Text := '';
-    end
-    else if ColumnType = 0 then
+      if ListViewSearch.Columns.Items[i].Caption = '도시명' then
+        break;
+      ColumnX := ColumnX + ListViewSearch.Columns.Items[i].Width;
+    end;
+  end;
+
+  if ColumnType = 2 then
+  begin
+    EditCities.Text := Text;
+    EditGoods.Text := '';
+  end
+  else if ColumnType = 1 then
+  begin
+    if (i = 0) or (ClickX < ColumnX) then
     begin
       EditCities.Text := '';
-      EditGoods.Text := ListViewSearch.Selected.Caption
+      EditGoods.Text := Text;
+    end
+    else
+    begin
+      EditCities.Text := SubItems[i - 1];
+      EditGoods.Text := '';
     end;
-    ButtonSearchClick(nil);
   end;
+  ButtonSearchClick(nil);
 end;
 
 { PRIVATE }
@@ -799,7 +859,10 @@ begin
       if ComparePixelColor(bmp, pointX + 16, pointY + 16, 187, 119, 0) then
         Name := '호박(식료품)'
       else
+      begin
         Name := '';
+        WriteLogForColor(bmp, pointX, 16, pointY, 16);
+      end;
     end;
 
     if Name = '' then
@@ -823,25 +886,34 @@ begin
       continue;
     end;
 
-    if ComparePixelColor(bmp, pointX + 237, pointY + 33, 238, 136, 34) then
+    if ComparePixelColor(bmp, pointX + 240, pointY + 27, 8, 8, 8) and
+       ComparePixelColor(bmp, pointX + 229, pointY + 38, 8, 8, 8) then
     begin
       Status := 1;
       StatusString := '▲';
     end
     else
-    if ComparePixelColor(bmp, pointX + 237, pointY + 33, 170, 238, 34) then
+    if ComparePixelColor(bmp, pointX + 240, pointY + 32, 8, 8, 8) and
+       ComparePixelColor(bmp, pointX + 229, pointY + 36, 8, 8, 8) then
     begin
       Status := 0;
       StatusString := '';
     end
     else
-    if ComparePixelColor(bmp, pointX + 237, pointY + 33, 17, 238, 204) then
+    if ComparePixelColor(bmp, pointX + 240, pointY + 40, 8, 8, 8) and
+       ComparePixelColor(bmp, pointX + 229, pointY + 29, 8, 8, 8) then
     begin
       Status := -1;
       StatusString := '▼';
     end
     else
     begin
+      WriteLogForColor(bmp, pointX, 240, pointY, 27);
+      WriteLogForColor(bmp, pointX, 229, pointY, 38);
+      WriteLogForColor(bmp, pointX, 240, pointY, 32);
+      WriteLogForColor(bmp, pointX, 229, pointY, 36);
+      WriteLogForColor(bmp, pointX, 240, pointY, 40);
+      WriteLogForColor(bmp, pointX, 229, pointY, 29);
       inc(pointY);
       continue;
     end;
@@ -940,25 +1012,34 @@ begin
       continue;
     end;
 
-    if ComparePixelColor(bmp, pointX + 237, (pointY + item * 56 + 33), 238, 136, 34) then
+    if ComparePixelColor(bmp, pointX + 240, pointY + item * 56 + 27, 8, 8, 8) and
+       ComparePixelColor(bmp, pointX + 229, pointY + item * 56 + 38, 8, 8, 8) then
     begin
       Status := 1;
       StatusString := '▲';
     end
     else
-    if ComparePixelColor(bmp, pointX + 237, (pointY + item * 56 + 33), 170, 238, 34) then
+    if ComparePixelColor(bmp, pointX + 240, pointY + item * 56 + 32, 8, 8, 8) and
+       ComparePixelColor(bmp, pointX + 229, pointY + item * 56 + 36, 8, 8, 8) then
     begin
       Status := 0;
       StatusString := '';
     end
     else
-    if ComparePixelColor(bmp, pointX + 237, (pointY + item * 56 + 33), 17, 238, 204) then
+    if ComparePixelColor(bmp, pointX + 240, pointY + item * 56 + 40, 8, 8, 8) and
+       ComparePixelColor(bmp, pointX + 229, pointY + item * 56 + 29, 8, 8, 8) then
     begin
       Status := -1;
       StatusString := '▼';
     end
     else
     begin
+      WriteLogForColor(bmp, pointX, 240, pointY + item * 56, 27);
+      WriteLogForColor(bmp, pointX, 229, pointY + item * 56, 38);
+      WriteLogForColor(bmp, pointX, 240, pointY + item * 56, 32);
+      WriteLogForColor(bmp, pointX, 229, pointY + item * 56, 36);
+      WriteLogForColor(bmp, pointX, 240, pointY + item * 56, 40);
+      WriteLogForColor(bmp, pointX, 229, pointY + item * 56, 29);
       continue;
     end;
 
@@ -977,6 +1058,21 @@ var
 begin
   dateString := formatdatetime('yyyy/mm/dd hh:mm:ss', Now);
   MemoLog.Lines.Add(Format('%s - %s', [dateString, msg]));
+end;
+
+procedure TFormQuote.WriteLogForColor(Bmp: TBitmap; pointX, increaseX, pointY, increaseY: Integer);
+var
+  VerticalLine: PRGBTriple;
+  X, Y: Integer;
+begin
+  X := pointX + increaseX;
+  Y := pointY + increaseY;
+  VerticalLine := bmp.ScanLine[Y];
+  WriteLog(Format('오류보고 :: 색상불일치 {%d, %d} R %d G %d B %d', [
+    increaseX, increaseY,
+    Integer(VerticalLine[X].rgbtRed),
+    Integer(VerticalLine[X].rgbtGreen),
+    Integer(VerticalLine[X].rgbtBlue)]));
 end;
 
 function TFormQuote.FindFlagImage(bmp: TBitmap): Integer;
