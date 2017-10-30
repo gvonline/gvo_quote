@@ -42,7 +42,7 @@ object FormQuote: TFormQuote
     Width = 75
     Height = 25
     Anchors = [akRight, akBottom]
-    Caption = 'Clear'
+    Caption = #51473#51648
     TabOrder = 0
     OnClick = ButtonClearClick
   end
@@ -100,24 +100,20 @@ object FormQuote: TFormQuote
     object TabSheet2: TTabSheet
       Caption = #44160#49353
       ImageIndex = 1
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       DesignSize = (
         468
         298)
       object LabelCities: TLabel
         Left = 8
         Top = 8
-        Width = 36
+        Width = 33
         Height = 13
         Caption = #46020#49884#47749
       end
       object LabelGoods: TLabel
         Left = 8
         Top = 39
-        Width = 36
+        Width = 33
         Height = 13
         Caption = #44368#50669#54408
       end
@@ -136,7 +132,7 @@ object FormQuote: TFormQuote
       object EditCities: TEdit
         Left = 54
         Top = 5
-        Width = 332
+        Width = 236
         Height = 21
         Anchors = [akLeft, akTop, akRight]
         TabOrder = 1
@@ -174,6 +170,17 @@ object FormQuote: TFormQuote
         Enabled = False
         TabOrder = 4
         OnClick = ButtonResetClick
+      end
+      object ComboBoxShortcut: TComboBox
+        Left = 296
+        Top = 5
+        Width = 90
+        Height = 21
+        Anchors = [akTop, akRight]
+        Enabled = False
+        TabOrder = 5
+        Text = #51600#44200#52286#44592
+        OnChange = ComboBoxShortcutChange
       end
     end
   end

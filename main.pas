@@ -1,4 +1,4 @@
-unit main;
+ï»¿unit main;
 
 interface
 
@@ -28,6 +28,7 @@ type
     LabelCities: TLabel;
     LabelGoods: TLabel;
     ButtonReset: TButton;
+    ComboBoxShortcut: TComboBox;
     procedure FormCreate(Sender: TObject);
     procedure ButtonClearClick(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -39,6 +40,7 @@ type
     procedure ListViewSearchCompare(Sender: TObject; Item1, Item2: TListItem; Data: Integer; var Compare: Integer);
     procedure ListViewSearchDblClick(Sender: TObject);
     procedure ButtonResetClick(Sender: TObject);
+    procedure ComboBoxShortcutChange(Sender: TObject);
   const
     GameClassName = 'Greate Voyages Online Game MainFrame';
     TitleOffsetX = 113;
@@ -62,6 +64,7 @@ type
     FontWidth: array of Byte;
     FontCount: Word;
     CityNames: TStringList;
+    SearchShortcuts: TStringList;
     CurrentWindow: HWND;
     Delay: Integer;
     ColumnSortIndex: Integer;
@@ -77,10 +80,11 @@ type
     function FindFlagImage(bmp: TBitmap): Integer;
     function GetText(bmp: TBitmap; X, Y, Width: Integer; PixelsFunc: TPixelsFunc): String;
     function GetServer: String;
-    function NaturalOrderCompareString(const A1, A2: string; ACaseSensitive: Boolean): Integer;
     function GetPassedTimeString(const PassedTime: Int64): String;
     function GetQuoteStatusString(const QuoteStatus: Int8): String;
     function GetResistStatusString(const ResistStatus: Int8): String;
+    procedure ReadSearchShortcuts(SearchShortcutsPath: String);
+    function NaturalOrderCompareString(const A1, A2: string; ACaseSensitive: Boolean): Integer;
 
   public
     { Public declarations }
@@ -192,8 +196,8 @@ end;
 
 procedure TFormQuote.FormCreate(Sender: TObject);
 var
-  CityName: String;
-  Latest, Version: String;
+  CityNamesPath, FontPath, SearchShortcutsPath: String;
+  Latest, Version, ErrorMessage: String;
   ExeName: string;
   Size, Handle: DWORD;
   Buffer: TBytes;
@@ -205,12 +209,44 @@ begin
   MemoLog.Lines.Clear;
   LabelCity.Caption := '';
   //WriteLog('FormCreate');
-  LoadFont;
-  CityName := ExtractFilePath(Application.ExeName) + 'CityNames.txt';
-  CityNames := TStringList.Create;
-  CityNames.Sorted := True;
-  CityNames.Duplicates := dupIgnore;
-  CityNames.LoadFromFile(CityName);
+
+  FontPath := ExtractFilePath(Application.ExeName) + 'Font.dat';
+  CityNamesPath := ExtractFilePath(Application.ExeName) + 'CityNames.txt';
+  SearchShortcutsPath := ExtractFilePath(Application.ExeName) + 'SearchShortcuts.txt';
+
+  if not fileexists(FontPath) then
+  begin
+    MessageBox(0, 'Font.dat íŒŒì¼ì„ ì°¾ì„ ìˆ˜ ì—†ìŠµë‹ˆë‹¤.', 'ì˜¤ë¥˜', MB_OK+MB_ICONERROR);
+    application.Terminate();
+  end
+  else
+  begin
+    LoadFont;
+
+    if not fileexists(CityNamesPath) then
+    begin
+      MessageBox(0, 'CityNames.txt íŒŒì¼ì„ ì°¾ì„ ìˆ˜ ì—†ìŠµë‹ˆë‹¤.', 'ì˜¤ë¥˜', MB_OK+MB_ICONERROR);
+      application.Terminate();
+    end
+    else
+    begin
+      CityNames := TStringList.Create;
+      CityNames.Sorted := True;
+      CityNames.Duplicates := dupIgnore;
+      CityNames.LoadFromFile(CityNamesPath);
+
+      if not fileexists(SearchShortcutsPath) then
+      begin
+        MessageBox(0, 'SearchShortcuts.txt íŒŒì¼ì„ ì°¾ì„ ìˆ˜ ì—†ìŠµë‹ˆë‹¤.', 'ì˜¤ë¥˜', MB_OK+MB_ICONERROR);
+        application.Terminate();
+      end
+      else
+      begin
+        ReadSearchShortcuts(SearchShortcutsPath);
+      end;
+    end;
+  end;
+
   Request := TRequest.Create;
 
   ExeName := Application.ExeName;
@@ -232,15 +268,15 @@ begin
   if Latest = '' then
   begin
     MemoLog.Lines.Add('');
-    MemoLog.Lines.Add('      ¼­¹ö¿Í ¿¬°áµÇÁö ¾Ê¾Ò½À´Ï´Ù.');
+    MemoLog.Lines.Add('      ì„œë²„ì™€ ì—°ê²°ë˜ì§€ ì•Šì•˜ìŠµë‹ˆë‹¤.');
     MemoLog.Lines.Add('');
     ComboBoxServer.Enabled := False;
   end
   else if Latest <> Version then
   begin
     MemoLog.Lines.Add('');
-    MemoLog.Lines.Add('      »õ ¹öÀüÀÌ ÀÖ½À´Ï´Ù.');
-    MemoLog.Lines.Add('      À¥»çÀÌÆ®¿¡¼­ ´Ù¿î¹ŞÀ¸¼¼¿ä.');
+    MemoLog.Lines.Add('      ìƒˆ ë²„ì „ì´ ìˆìŠµë‹ˆë‹¤.');
+    MemoLog.Lines.Add('      ì›¹ì‚¬ì´íŠ¸ì—ì„œ ë‹¤ìš´ë°›ìœ¼ì„¸ìš”.');
     MemoLog.Lines.Add('');
     ComboBoxServer.Enabled := False;
     ButtonClear.Enabled := False;
@@ -248,8 +284,8 @@ begin
   else
   begin
     MemoLog.Lines.Add('');
-    MemoLog.Lines.Add('      È¯¿µÇÕ´Ï´Ù.');
-    MemoLog.Lines.Add('      ÀÚ¼¼ÇÑ ³»¿ëÀº À¥»çÀÌÆ®¸¦ È®ÀÎÇÏ¼¼¿ä.');
+    MemoLog.Lines.Add('      í™˜ì˜í•©ë‹ˆë‹¤.');
+    MemoLog.Lines.Add('      ìì„¸í•œ ë‚´ìš©ì€ ì›¹ì‚¬ì´íŠ¸ë¥¼ í™•ì¸í•˜ì„¸ìš”.');
     MemoLog.Lines.Add('');
   end;
 end;
@@ -266,6 +302,8 @@ procedure TFormQuote.ButtonResetClick(Sender: TObject);
 var
   i: Integer;
 begin
+  ComboBoxShortcut.ItemIndex := -1;
+  ComboBoxShortcut.Text := 'ì¦ê²¨ì°¾ê¸°';
   EditCities.Text := '';
   EditGoods.Text := '';
   ListViewSearch.Clear;
@@ -278,9 +316,9 @@ end;
 
 procedure TFormQuote.ButtonSearchClick(Sender: TObject);
 const
-  ColumnNamesForDashboard: array[0..3] of String = ('µµ½Ã¸í', 'µî·Ï°Ç¼ö', 'µµ½Ã»óÅÂ', '°»½Å½Ã°£');
+  ColumnNamesForDashboard: array[0..3] of String = ('ë„ì‹œëª…', 'ë“±ë¡ê±´ìˆ˜', 'ë„ì‹œìƒíƒœ', 'ê°±ì‹ ì‹œê°„');
   ColumnWidthForDashboard: array[0..3] of Integer = (    120,         60,        160,        100);
-  ColumnNamesForCommon: array[0..8] of String = ('Ç°¸í', 'Ç°¸ñ', '½Ã¼¼', '½Ã¼¼»óÅÂ', '½Ã¼¼°»½Å½Ã°£', 'µµ½Ã¸í', '³»¼ºÇ×', 'µµ½Ã»óÅÂ', '»óÅÂ°»½Å½Ã°£');
+  ColumnNamesForCommon: array[0..8] of String = ('í’ˆëª…', 'í’ˆëª©', 'ì‹œì„¸', 'ì‹œì„¸ìƒíƒœ', 'ì‹œì„¸ê°±ì‹ ì‹œê°„', 'ë„ì‹œëª…', 'ë‚´ì„±í•­', 'ë„ì‹œìƒíƒœ', 'ìƒíƒœê°±ì‹ ì‹œê°„');
   ColumnWidthForCommon: array[0..8] of Integer = (   80,     50,     40,         60,            100,      100,       50,        150,            120);
 var
   i, j, ColumnCount: Integer;
@@ -347,19 +385,19 @@ begin
         JSONPath := Format('[%d].%s', [i, ColumnNames[j]]);
         Text := JSONArray.GetValue<String>(JSONPath);
 
-        if EndsStr('°»½Å½Ã°£', ColumnNames[j]) then
+        if EndsStr('ê°±ì‹ ì‹œê°„', ColumnNames[j]) then
         begin
           if Text = '0' then
             Text := ''
           else if Text <> '' then
             Text := GetPassedTimeString(StrToInt(Text));
         end
-        else if '½Ã¼¼»óÅÂ' = ColumnNames[j] then
+        else if 'ì‹œì„¸ìƒíƒœ' = ColumnNames[j] then
         begin
           if Text <> '' then
             Text := GetQuoteStatusString(StrToInt(Text));
         end
-        else if '³»¼ºÇ×' = ColumnNames[j] then
+        else if 'ë‚´ì„±í•­' = ColumnNames[j] then
         begin
           if Text <> '' then
             Text := GetResistStatusString(StrToInt(Text));
@@ -392,6 +430,12 @@ begin
   TimerLoop.Enabled := not ComboBoxServer.Enabled;
 end;
 
+procedure TFormQuote.ComboBoxShortcutChange(Sender: TObject);
+begin
+  if ComboBoxShortcut.ItemIndex >= 0 then
+    EditCities.Text := SearchShortcuts[ComboBoxShortcut.ItemIndex];
+end;
+
 procedure TFormQuote.ButtonClearClick(Sender: TObject);
 begin
   CurrentWindow := 0;
@@ -404,8 +448,8 @@ begin
   TimerLoop.Enabled := False;
   MemoLog.Lines.Clear;
   MemoLog.Lines.Add('');
-  MemoLog.Lines.Add('      ÇÁ·Î±×·¥ µ¿ÀÛÀ» ÀÏ½ÃÀûÀ¸·Î ÁßÁö ÇÏ¿´½À´Ï´Ù.');
-  MemoLog.Lines.Add('      ¼­¹ö¸¦ ¼±ÅÃ ÇÏ¿© ÁÖ½Ê½Ã¿À.');
+  MemoLog.Lines.Add('      í”„ë¡œê·¸ë¨ ë™ì‘ì„ ì¼ì‹œì ìœ¼ë¡œ ì¤‘ì§€ í•˜ì˜€ìŠµë‹ˆë‹¤.');
+  MemoLog.Lines.Add('      ì„œë²„ë¥¼ ì„ íƒ í•˜ì—¬ ì£¼ì‹­ì‹œì˜¤.');
   MemoLog.Lines.Add('');
 end;
 
@@ -417,6 +461,7 @@ var
   //WindowPoint: TPoint;
   DC: HDC;
   Bmp: TBitmap;
+  Captured: Boolean;
 begin
   Handle := GetForegroundWindow;
   SetLength(ClassName, 255);
@@ -433,7 +478,7 @@ begin
     CurrentWindow := Handle;
     if WindowList.ContainsKey(Handle) then
     begin
-      LabelCity.Caption := 'µµ½Ã¸í: ' + WindowList[Handle].CityName;
+      LabelCity.Caption := 'ë„ì‹œëª…: ' + WindowList[Handle].CityName;
     end else begin
       WindowList.Add(CurrentWindow, TGameState.Create(CurrentWindow));
       LabelCity.Caption := '';
@@ -452,25 +497,33 @@ begin
   BitBlt(Bmp.Canvas.Handle, 0, 0, WindowRect.Width, WindowRect.Height, DC, WindowPoint.X, WindowPoint.Y, SRCCOPY);
   ReleaseDC(Handle, DC);
 }
-  WinApi.Windows.GetClientRect(Handle, WindowRect);
+  Captured := WinApi.Windows.GetClientRect(Handle, WindowRect);
+  if (not Captured) or (WindowRect.Width < 800) or (WindowRect.Height < 600) then
+  begin
+    exit;
+  end;
+
   Bmp := TBitmap.Create;
   Bmp.Height := WindowRect.Height;
   Bmp.Width := WindowRect.Width;
   Bmp.PixelFormat := pf24bit;
   DC := GetDC(Handle);
-  BitBlt(Bmp.Canvas.Handle, 0, 0, WindowRect.Width, WindowRect.Height, DC, 0, 0, SRCCOPY);
+  Captured := BitBlt(Bmp.Canvas.Handle, 0, 0, WindowRect.Width, WindowRect.Height, DC, 0, 0, SRCCOPY);
   ReleaseDC(Handle, DC);
 
-  //WriteLog('FindCityName');
-  FindCityName(Bmp);
-  if (CurrentWindow = Handle) and (WindowList[Handle].CityName <> '') then
+  if Captured then
   begin
-    //WriteLog('FindChatMessage');
-    FindChatMessage(Bmp);
-    //WriteLog('FindTrade');
-    FindTrade(Bmp);
+    //WriteLog('FindCityName');
+    FindCityName(Bmp);
+    if (CurrentWindow = Handle) and (WindowList[Handle].CityName <> '') then
+    begin
+      //WriteLog('FindChatMessage');
+      FindChatMessage(Bmp);
+      //WriteLog('FindTrade');
+      FindTrade(Bmp);
+    end;
+    //WriteLog('End');
   end;
-  //WriteLog('End');
 
   Bmp.Free;
   TimerLoop.Enabled := True;
@@ -557,7 +610,7 @@ begin
   begin
     for i := 0 to ListViewSearch.Columns.Count - 1 do
     begin
-      if ListViewSearch.Columns.Items[i].Caption = 'µµ½Ã¸í' then
+      if ListViewSearch.Columns.Items[i].Caption = 'ë„ì‹œëª…' then
         break;
       ColumnX := ColumnX + ListViewSearch.Columns.Items[i].Width;
     end;
@@ -719,7 +772,7 @@ begin
     if fail[item] then
       continue;
     //WriteLog('FindCityName: ' + CityNames[item]);
-    LabelCity.Caption := 'µµ½Ã¸í: ' + CityNames[item];
+    LabelCity.Caption := 'ë„ì‹œëª…: ' + CityNames[item];
     WindowList[CurrentWindow].CityName := CityNames[item];
     break;
   end;
@@ -741,20 +794,20 @@ begin
     pointX := 12;
     log := GetText(bmp, pointX, pointY, 568, @GetBrightPoints);
 
-    if StartsStr('±³¿ª¼ÒÁÖÀÎ      £º', log) then
+    if StartsStr('êµì—­ì†Œì£¼ì¸      ï¼š', log) then
     begin
       status := Trim(Copy(log, 13, Length(log)));
     end;
 
-    if StartsStr('±³¿ª¼ÒÀÇ µµÁ¦   £º', log) then
+    if StartsStr('êµì—­ì†Œì˜ ë„ì œ   ï¼š', log) then
     begin
       status := Trim(Copy(log, 12, Length(log)));
     end;
 
-    if StartsStr('Ç×±¸°ü¸®        £º', log) or
-       StartsStr('Ç×±¸¾È³»¿ø      £º', log) or
-       StartsStr('¿ªÀå            £º', log) or
-       StartsStr('¸¶ºÎ            £º', log) then
+    if StartsStr('í•­êµ¬ê´€ë¦¬        ï¼š', log) or
+       StartsStr('í•­êµ¬ì•ˆë‚´ì›      ï¼š', log) or
+       StartsStr('ì—­ì¥            ï¼š', log) or
+       StartsStr('ë§ˆë¶€            ï¼š', log) then
     begin
       status := '';
     end;
@@ -768,7 +821,7 @@ begin
     (State.CityStatus <> (State.CityName + '::' + status)) then
   begin
     State.CityStatus := State.CityName + '::' + status;
-    WriteLog(State.CityName + ' ±³¿ª¼Ò :: ' + status);
+    WriteLog(State.CityName + ' êµì—­ì†Œ :: ' + status);
     Request.SendCityInfo(GetServer, State.CityName, status);
   end;
 end;
@@ -799,13 +852,13 @@ begin
   pointX := centerX - 281; // 119;
   pointY := centerY - 223; // 77;
   Title := Trim(GetText(bmp, pointX, pointY, 50, @GetBlackPoints));
-  if Title <> '¼ÒÀ¯¹°Ç°' then
+  if Title <> 'ì†Œìœ ë¬¼í’ˆ' then
   begin
     pointX := centerX - 226; // 174;
     pointY := centerY - 223; // 77;
     Title := Trim(GetText(bmp, pointX, pointY, 50, @GetBlackPoints));
   end;
-  if Title <> '¼ÒÀ¯¹°Ç°' then
+  if Title <> 'ì†Œìœ ë¬¼í’ˆ' then
   begin
     State.Selected := '';
     exit;
@@ -851,12 +904,12 @@ begin
     end;
 
     Name := Trim(GetText(bmp, pointX + 52, pointY + 6, 180, GetWhitePoints));
-    if Name = 'È£¹Ú' then
+    if Name = 'í˜¸ë°•' then
     begin
       if ComparePixelColor(bmp, pointX + 16, pointY + 16, 221, 221, 221) then
-        Name := 'È£¹Ú(º¸¼®)'
+        Name := 'í˜¸ë°•(ë³´ì„)'
       else
-        Name := 'È£¹Ú(½Ä·áÇ°)';
+        Name := 'í˜¸ë°•(ì‹ë£Œí’ˆ)';
     end;
 
     if Name = '' then
@@ -867,7 +920,7 @@ begin
 
     Quote := Trim(GetText(bmp, pointX + 169, pointY + 26, 80, GetWhitePoints));
     if (Length(Quote) < 4) or (Quote[1] <> '(') or
-      (Copy(Quote, Length(Quote) - 1, 2) <> '£¥)') then
+      (Copy(Quote, Length(Quote) - 1, 2) <> 'ï¼…)') then
     begin
       inc(pointY);
       continue;
@@ -884,7 +937,7 @@ begin
        ComparePixelColor(bmp, pointX + 229, pointY + 38, 8, 8, 8) then
     begin
       Status := 1;
-      StatusString := '¡ã';
+      StatusString := 'â–²';
     end
     else
     if ComparePixelColor(bmp, pointX + 240, pointY + 32, 8, 8, 8) and
@@ -898,7 +951,7 @@ begin
        ComparePixelColor(bmp, pointX + 229, pointY + 29, 8, 8, 8) then
     begin
       Status := -1;
-      StatusString := '¡å';
+      StatusString := 'â–¼';
     end
     else
     begin
@@ -947,7 +1000,7 @@ begin
   end;
 
   Title := Trim(GetText(bmp, centerX + TitleOffsetX, centerY + TitleOffsetY, 120, @GetBlackPoints));
-  if Title <> 'ÀÎ±Ù µµ½Ã ½Ã¼¼' then
+  if Title <> 'ì¸ê·¼ ë„ì‹œ ì‹œì„¸' then
     exit;
   //WriteLog('Title: ' + Title);
 
@@ -995,7 +1048,7 @@ begin
 
     Quote := Trim(GetText(bmp, pointX + 169, pointY + item * 56 + 26, 80, GetWhitePoints));
     if (Length(Quote) < 4) or (Quote[1] <> '(') or
-      (Copy(Quote, Length(Quote) - 1, 2) <> '£¥)') then
+      (Copy(Quote, Length(Quote) - 1, 2) <> 'ï¼…)') then
     begin
       continue;
     end;
@@ -1010,7 +1063,7 @@ begin
        ComparePixelColor(bmp, pointX + 229, pointY + item * 56 + 38, 8, 8, 8) then
     begin
       Status := 1;
-      StatusString := '¡ã';
+      StatusString := 'â–²';
     end
     else
     if ComparePixelColor(bmp, pointX + 240, pointY + item * 56 + 32, 8, 8, 8) and
@@ -1024,7 +1077,7 @@ begin
        ComparePixelColor(bmp, pointX + 229, pointY + item * 56 + 29, 8, 8, 8) then
     begin
       Status := -1;
-      StatusString := '¡å';
+      StatusString := 'â–¼';
     end
     else
     begin
@@ -1062,7 +1115,7 @@ begin
   X := pointX + increaseX;
   Y := pointY + increaseY;
   VerticalLine := bmp.ScanLine[Y];
-  WriteLog(Format('¿À·ùº¸°í :: »ö»óºÒÀÏÄ¡ {%d, %d} R %d G %d B %d', [
+  WriteLog(Format('ì˜¤ë¥˜ë³´ê³  :: ìƒ‰ìƒë¶ˆì¼ì¹˜ {%d, %d} R %d G %d B %d', [
     increaseX, increaseY,
     Integer(VerticalLine[X].rgbtRed),
     Integer(VerticalLine[X].rgbtGreen),
@@ -1223,27 +1276,50 @@ begin
   if PassedTime <= 0 then
     exit
   else if PassedTime < 60 then
-    Result := Format('%dÃÊ Àü', [PassedTime])
+    Result := Format('%dì´ˆ ì „', [PassedTime])
   else if PassedTime < 3600 then
-    Result := Format('%dºĞ %dÃÊ Àü', [Floor(PassedTime div 60), PassedTime mod 60])
+    Result := Format('%dë¶„ %dì´ˆ ì „', [Floor(PassedTime div 60), PassedTime mod 60])
   else
-    Result := Format('%d½Ã°£ Àü', [Floor(PassedTime div 3600)]);
+    Result := Format('%dì‹œê°„ ì „', [Floor(PassedTime div 3600)]);
 end;
 
 function TFormQuote.GetQuoteStatusString(const QuoteStatus: Int8): String;
 begin
   Result := '';
   if QuoteStatus > 0 then
-    Result := '¡ã'
+    Result := 'â–²'
   else if QuoteStatus < 0 then
-    Result := '¡å';
+    Result := 'â–¼';
 end;
 
 function TFormQuote.GetResistStatusString(const ResistStatus: Int8): String;
 begin
   Result := '';
   if ResistStatus = 1 then
-    Result := '¡Ú';
+    Result := 'â˜…';
+end;
+
+procedure TFormQuote.ReadSearchShortcuts(SearchShortcutsPath: String);
+var
+  ReadFile: TStringList;
+  i, Max, PosIndex: Integer;
+begin
+  ReadFile := TStringList.Create;
+  ReadFile.LoadFromFile(SearchShortcutsPath);
+  Max := ReadFile.Count - 1;
+  if Max < 1 then
+    exit;
+
+  SearchShortcuts := TStringList.Create;
+  for i := 0 to Max do
+  begin
+    PosIndex := Pos('=', ReadFile[i]);
+    if PosIndex < 1 then
+      continue;
+    ComboBoxShortcut.Items.Add(Trim(Copy(ReadFile[i], 1, (PosIndex - 1))));
+    SearchShortcuts.Add(Trim(Copy(ReadFile[i], (PosIndex + 1), 8192)));
+  end;
+  ComboBoxShortcut.Enabled := True;
 end;
 
 // http://yypbd.tistory.com/590
@@ -1297,7 +1373,7 @@ begin
       begin
         if EndPos1 - Pos1 = EndPos2 - Pos2 then
         begin
-          // ÀÌºÎºĞÀÌ ¼ıÀÚºñ±³ÀÓ. StrToInt ÇÑ ´ÙÀ½¿¡ »©µµ µÉ °ÍÀÓ
+          // ì´ë¶€ë¶„ì´ ìˆ«ìë¹„êµì„. StrToInt í•œ ë‹¤ìŒì— ë¹¼ë„ ë  ê²ƒì„
           Result := CompareStr( Copy(Str1, Pos1+1, EndPos1 - Pos1),  Copy(Str2, Pos2+1, EndPos1 - Pos1) ) ;
 
           if Result = 0 then
