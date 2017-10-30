@@ -158,6 +158,7 @@ object FormQuote: TFormQuote
         ViewStyle = vsReport
         OnColumnClick = ListViewSearchColumnClick
         OnCompare = ListViewSearchCompare
+        OnCustomDrawSubItem = ListViewCustomDrawSubItem
         OnDblClick = ListViewSearchDblClick
       end
       object ButtonReset: TButton

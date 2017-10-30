@@ -39,6 +39,7 @@ type
     procedure ListViewSearchColumnClick(Sender: TObject; Column: TListColumn);
     procedure ListViewSearchCompare(Sender: TObject; Item1, Item2: TListItem; Data: Integer; var Compare: Integer);
     procedure ListViewSearchDblClick(Sender: TObject);
+    procedure ListViewCustomDrawSubItem(Sender: TCustomListView; Item: TListItem; SubItem: Integer; State: TCustomDrawState; var DefaultDraw: Boolean);
     procedure ButtonResetClick(Sender: TObject);
     procedure ComboBoxShortcutChange(Sender: TObject);
   const
@@ -635,6 +636,26 @@ begin
     end;
   end;
   ButtonSearchClick(nil);
+end;
+
+procedure TFormQuote.ListViewCustomDrawSubItem(Sender: TCustomListView; Item: TListItem; SubItem: Integer; State: TCustomDrawState; var DefaultDraw: Boolean);
+var
+  Text: String;
+begin
+  if (SubItem = 3) or (SubItem = 6) then
+  begin
+    Text := Item.SubItems.Strings[SubItem - 1];
+    if Text = '▲' then
+      Sender.Canvas.Font.Color := clMaroon
+    else if Text = '▼' then
+      Sender.Canvas.Font.Color := clNavy
+    else if Text = '★' then
+      Sender.Canvas.Font.Color := clOlive
+    else
+      Sender.Canvas.Font.Color := clDefault;
+    exit;
+  end;
+  Sender.Canvas.Font.Color := clDefault;
 end;
 
 { PRIVATE }
