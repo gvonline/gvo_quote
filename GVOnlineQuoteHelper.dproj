@@ -95,9 +95,9 @@
         <VerInfo_MajorVer>0</VerInfo_MajorVer>
         <VerInfo_MinorVer>2</VerInfo_MinorVer>
         <VerInfo_AutoIncVersion>true</VerInfo_AutoIncVersion>
-        <VerInfo_Keys>CompanyName=;FileDescription=$(MSBuildProjectName);FileVersion=0.2.0.7;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProgramID=ga.gvonline.$(MSBuildProjectName);ProductName=$(MSBuildProjectName);ProductVersion=0.2.0;Comments=</VerInfo_Keys>
+        <VerInfo_Keys>CompanyName=;FileDescription=$(MSBuildProjectName);FileVersion=0.2.0.8;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProgramID=ga.gvonline.$(MSBuildProjectName);ProductName=$(MSBuildProjectName);ProductVersion=0.2.0;Comments=</VerInfo_Keys>
         <VerInfo_Locale>1033</VerInfo_Locale>
-        <VerInfo_Build>7</VerInfo_Build>
+        <VerInfo_Build>8</VerInfo_Build>
     </PropertyGroup>
     <ItemGroup>
         <DelphiCompile Include="$(MainSource)">
