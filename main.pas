@@ -65,7 +65,8 @@ type
     FontWidth: array of Byte;
     FontCount: Word;
     CityNames: TStringList;
-    SearchShortcuts: TStringList;
+    CityShortcuts: TStringList;
+    GoodsShortcuts: TStringList;
     CurrentWindow: HWND;
     Delay: Integer;
     ColumnSortIndex: Integer;
@@ -218,35 +219,37 @@ begin
   if not fileexists(FontPath) then
   begin
     MessageBox(0, 'Font.dat 파일을 찾을 수 없습니다.', '오류', MB_OK+MB_ICONERROR);
-    application.Terminate();
-  end
-  else
-  begin
-    LoadFont;
-
-    if not fileexists(CityNamesPath) then
-    begin
-      MessageBox(0, 'CityNames.txt 파일을 찾을 수 없습니다.', '오류', MB_OK+MB_ICONERROR);
-      application.Terminate();
-    end
-    else
-    begin
-      CityNames := TStringList.Create;
-      CityNames.Sorted := True;
-      CityNames.Duplicates := dupIgnore;
-      CityNames.LoadFromFile(CityNamesPath);
-
-      if not fileexists(SearchShortcutsPath) then
-      begin
-        MessageBox(0, 'SearchShortcuts.txt 파일을 찾을 수 없습니다.', '오류', MB_OK+MB_ICONERROR);
-        application.Terminate();
-      end
-      else
-      begin
-        ReadSearchShortcuts(SearchShortcutsPath);
-      end;
-    end;
+    Application.Terminate;
+    exit;
   end;
+
+  if not fileexists(CityNamesPath) then
+  begin
+    MessageBox(0, 'CityNames.txt 파일을 찾을 수 없습니다.', '오류', MB_OK+MB_ICONERROR);
+    Application.Terminate;
+    exit;
+  end;
+
+  if not fileexists(SearchShortcutsPath) then
+  begin
+    MessageBox(0, 'SearchShortcuts.txt 파일을 찾을 수 없습니다.', '오류', MB_OK+MB_ICONERROR);
+    Application.Terminate;
+    exit;
+  end;
+
+  LoadFont;
+
+  CityNames := TStringList.Create;
+  CityNames.Sorted := True;
+  CityNames.Duplicates := dupIgnore;
+  CityNames.LoadFromFile(CityNamesPath);
+
+  CityShortcuts := TStringList.Create;
+  CityShortcuts.Add('');
+  GoodsShortcuts := TStringList.Create;
+  GoodsShortcuts.Add('');
+
+  ReadSearchShortcuts(SearchShortcutsPath);
 
   Request := TRequest.Create;
 
@@ -294,17 +297,27 @@ end;
 procedure TFormQuote.FormDestroy(Sender: TObject);
 begin
   CurrentWindow := 0;
-  WindowList.Free;
-  CityNames.Free;
-  Request.Terminate;
+  if Assigned(WindowList) then
+    FreeAndNil(WindowList);
+  if Assigned(CityNames) then
+    FreeAndNil(CityNames);
+  if Assigned(CityShortcuts) then
+    FreeAndNil(CityShortcuts);
+  if Assigned(GoodsShortcuts) then
+    FreeAndNil(GoodsShortcuts);
+  if Assigned(Request) then
+    Request.Terminate;
 end;
 
 procedure TFormQuote.ButtonResetClick(Sender: TObject);
 var
   i: Integer;
 begin
-  ComboBoxShortcut.ItemIndex := -1;
-  ComboBoxShortcut.Text := '즐겨찾기';
+  ComboBoxShortcut.ItemIndex := 0;
+  ComboBoxShortcut.Enabled := False;
+  ComboBoxShortcut.Style := csDropDown;
+  ComboBoxShortcut.Style := csDropDownList;
+  ComboBoxShortcut.Enabled := True;
   EditCities.Text := '';
   EditGoods.Text := '';
   ListViewSearch.Clear;
@@ -362,6 +375,7 @@ begin
   end;
 
   ListViewSearch.Clear;
+
   if ListViewSearch.Columns.Count > 0 then
   begin
     for i := ListViewSearch.Columns.Count - 1 downto 0 do
@@ -377,6 +391,7 @@ begin
     ListViewSearch.Columns.Items[i].Width := ColumnWidth[i];
   end;
 
+  ListViewSearch.Items.BeginUpdate;
   for i := 0 to JSONArray.size - 1 do
   begin
     with ListViewSearch.Items.Add do
@@ -416,6 +431,8 @@ begin
       end;
     end;
   end;
+
+  ListViewSearch.Items.EndUpdate;
 end;
 
 procedure TFormQuote.ButtonWebsiteClick(Sender: TObject);
@@ -433,8 +450,8 @@ end;
 
 procedure TFormQuote.ComboBoxShortcutChange(Sender: TObject);
 begin
-  if ComboBoxShortcut.ItemIndex >= 0 then
-    EditCities.Text := SearchShortcuts[ComboBoxShortcut.ItemIndex];
+  EditCities.Text := CityShortcuts[ComboBoxShortcut.ItemIndex];
+  EditGoods.Text := GoodsShortcuts[ComboBoxShortcut.ItemIndex];
 end;
 
 procedure TFormQuote.ButtonClearClick(Sender: TObject);
@@ -1324,22 +1341,44 @@ procedure TFormQuote.ReadSearchShortcuts(SearchShortcutsPath: String);
 var
   ReadFile: TStringList;
   i, Max, PosIndex: Integer;
+  Text: String;
 begin
+  CityShortcuts.Clear;
+  CityShortcuts.Add('');
+  GoodsShortcuts.Clear;
+  GoodsShortcuts.Add('');
+  ComboBoxShortcut.Items.Clear;
+  ComboBoxShortcut.Items.Add('즐겨찾기');
+
   ReadFile := TStringList.Create;
   ReadFile.LoadFromFile(SearchShortcutsPath);
   Max := ReadFile.Count - 1;
   if Max < 1 then
     exit;
 
-  SearchShortcuts := TStringList.Create;
   for i := 0 to Max do
   begin
     PosIndex := Pos('=', ReadFile[i]);
     if PosIndex < 1 then
       continue;
     ComboBoxShortcut.Items.Add(Trim(Copy(ReadFile[i], 1, (PosIndex - 1))));
-    SearchShortcuts.Add(Trim(Copy(ReadFile[i], (PosIndex + 1), 8192)));
+    Text := Trim(Copy(ReadFile[i], (PosIndex + 1), Length(ReadFile[i])));
+
+    PosIndex := Pos('+', Text);
+    if PosIndex < 1 then
+    begin
+      CityShortcuts.Add(Text);
+      GoodsShortcuts.Add('');
+      continue;
+    end;
+
+    CityShortcuts.Add(Trim(Copy(Text, 1, (PosIndex - 1))));
+    GoodsShortcuts.Add(Trim(Copy(Text, (PosIndex + 1), Length(Text))));
   end;
+
+  ReadFile.Free;
+
+  ComboBoxShortcut.ItemIndex := 0;
   ComboBoxShortcut.Enabled := True;
 end;
 

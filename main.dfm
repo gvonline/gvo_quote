@@ -8,6 +8,7 @@ object FormQuote: TFormQuote
   Color = clBtnFace
   Constraints.MinHeight = 400
   Constraints.MinWidth = 500
+  DoubleBuffered = True
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
   Font.Height = -11
@@ -177,11 +178,15 @@ object FormQuote: TFormQuote
         Top = 5
         Width = 90
         Height = 21
+        Style = csDropDownList
         Anchors = [akTop, akRight]
         Enabled = False
+        ItemIndex = 0
         TabOrder = 5
         Text = #51600#44200#52286#44592
         OnChange = ComboBoxShortcutChange
+        Items.Strings = (
+          #51600#44200#52286#44592)
       end
     end
   end
