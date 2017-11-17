@@ -3,7 +3,7 @@ unit gamestate;
 interface
 
 uses
-  System.SysUtils, Winapi.Windows, Generics.Collections;
+  SysUtils, Windows, contnrs;
 
 type
   TGameState = class
@@ -11,7 +11,7 @@ type
     fHandle: HWND;
     fCityName: String;
     fCityStatus: String;
-    fItems: TDictionary<String, String>;
+    fItems: TFPStringHashTable;
     fSelected: String;
   public
     constructor Create(Handle: HWND);
@@ -29,7 +29,7 @@ implementation
 constructor TGameState.Create(Handle: HWND);
 begin
   fHandle := Handle;
-  fItems := TDictionary<String, String>.Create;
+  fItems := TFPStringHashTable.Create;
 end;
 
 destructor TGameState.Destroy;
@@ -53,12 +53,7 @@ begin
   Result := False;
   Key := CityName + '::' + ItemName;
   Value := IntToStr(Quote) + '::' + IntToStr(Status);
-  if not fItems.ContainsKey(Key) then
-  begin
-    fItems.Add(Key, Value);
-    Result := True;
-  end
-  else if fItems[Key] <> Value then
+  if fItems[Key] <> Value then
   begin
     fItems[Key] := Value;
     Result := True;

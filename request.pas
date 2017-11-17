@@ -3,7 +3,7 @@ unit request;
 interface
 
 uses
-  System.SysUtils, System.Classes, System.SyncObjs, HTTPSend;
+  SysUtils, Classes, SyncObjs, HTTPSend;
 
 type
   TRequest = class(TThread)
@@ -54,7 +54,7 @@ end;
 
 procedure TRequest.Execute;
 var
-  Param: AnsiString;
+  Param: String;
 begin
   while not Terminated do
   begin
@@ -66,7 +66,7 @@ begin
       Lock.Leave;
 
       HTTP.Document.Clear;
-      HTTP.Document.Write(BytesOf(Param), Length(Param));
+      HTTP.Document.Write(PAnsiChar(Param)^, Length(Param));
       HTTP.MimeType := 'application/x-www-form-urlencoded';
       HTTP.HTTPMethod('POST', URL);
     end
@@ -115,7 +115,7 @@ var
 begin
   Text := TStringList.Create;
   if HTTPGetText(VersionURL, Text) and (text.Count > 0) then
-    Result := UTF8toString(Text[0])
+    Result := Text[0]
   else
     Result := '';
   Text.Free;
@@ -125,7 +125,7 @@ function TRequest.GetSearchResult(Server, CityNames, ItemNames: String): String;
 var
   Param: String;
   Response: TMemoryStream;
-  Text: AnsiString;
+  Text: String;
 begin
   Param := 'server=' + EncodeURLElement(UTF8Encode(Server));
   Param := Param + '&city=' + EncodeURLElement(UTF8Encode(CityNames));
@@ -134,7 +134,7 @@ begin
   Response := TMemoryStream.Create;
   if HttpPostURL(SearchURL, Param, Response) and (Response.Size > 0) then
     SetString(Text, PAnsiChar(Response.Memory), Response.Size);
-  Result := UTF8toString(Text);
+  Result := Text;
   Response.Free;
 end;
 

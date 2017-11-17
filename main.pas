@@ -3,49 +3,51 @@
 interface
 
 uses
-  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, System.JSON,
-  Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ExtCtrls,
-  Generics.Collections,
-  GameState, Request, Vcl.ComCtrls;
+  Windows, Messages, SysUtils, Variants, Classes,
+  Graphics, Controls, Forms, Dialogs, StdCtrls, ExtCtrls,
+  GameState, Request, ComCtrls,
+  lazutf8, fgl, fpjson, jsonparser, jsonscanner, IntfGraphics;
 
 type
-  TPixelsFunc = function(bitmap: TBitmap; X, Y: Integer): Word;
+  TPixelsFunc = function(lazImage: TLazIntfImage; X, Y: Integer): Word;
+
+  { TFormQuote }
 
   TFormQuote = class(TForm)
-    MemoLog: TMemo;
     ButtonClear: TButton;
-    TimerLoop: TTimer;
-    LabelCity: TLabel;
+    ButtonReset: TButton;
+    ButtonSearch: TButton;
     ButtonWebsite: TButton;
     ComboBoxServer: TComboBox;
+    ComboBoxShortcut: TComboBox;
+    EditCities: TEdit;
+    EditGoods: TEdit;
+    LabelCities: TLabel;
+    LabelCity: TLabel;
+    LabelGoods: TLabel;
+    ListViewSearch: TListView;
+    MemoLog: TMemo;
     PageControl1: TPageControl;
     TabSheet1: TTabSheet;
     TabSheet2: TTabSheet;
-    ListViewSearch: TListView;
-    EditCities: TEdit;
-    EditGoods: TEdit;
-    ButtonSearch: TButton;
-    LabelCities: TLabel;
-    LabelGoods: TLabel;
-    ButtonReset: TButton;
-    ComboBoxShortcut: TComboBox;
+    TimerLoop: TTimer;
     procedure FormCreate(Sender: TObject);
-    procedure ButtonClearClick(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure TimerLoopTimer(Sender: TObject);
+    procedure ButtonClearClick(Sender: TObject);
     procedure ButtonWebsiteClick(Sender: TObject);
-    procedure ComboBoxServerChange(Sender: TObject);
     procedure ButtonSearchClick(Sender: TObject);
-    procedure ListViewSearchColumnClick(Sender: TObject; Column: TListColumn);
-    procedure ListViewSearchCompare(Sender: TObject; Item1, Item2: TListItem; Data: Integer; var Compare: Integer);
-    procedure ListViewSearchDblClick(Sender: TObject);
-    procedure ListViewCustomDrawSubItem(Sender: TCustomListView; Item: TListItem; SubItem: Integer; State: TCustomDrawState; var DefaultDraw: Boolean);
     procedure ButtonResetClick(Sender: TObject);
+    procedure ComboBoxServerChange(Sender: TObject);
     procedure ComboBoxShortcutChange(Sender: TObject);
+    procedure ListViewSearchColumnClick(Sender: TObject; Column: TListColumn);
+    procedure ListViewSearchDblClick(Sender: TObject);
+    procedure ListViewSearchCompare(Sender: TObject; Item1, Item2: TListItem; Data: Integer; var Compare: Integer);
+    procedure ListViewCustomDrawSubItem(Sender: TCustomListView; Item: TListItem; SubItem: Integer; State: TCustomDrawState; var DefaultDraw: Boolean);
   const
     GameClassName = 'Greate Voyages Online Game MainFrame';
-    TitleOffsetX = 113;
-    TitleOffsetY = -223;
+    OtherCitiesOffsetX = 113;
+    OtherCitiesOffsetY = -223;
     ConferenceOffsetX = 8;
     ConferenceOffsetY = 8;
     CityOffsetX = 34;
@@ -54,39 +56,37 @@ type
     FlagOffsetY = 8;
     FlagWidth = 24;
     FlagHeight = 16;
-    ReadPixelCount = 16;
-    CaptureWatingTime = 3000;
   private
     { Private declarations }
-    Request: TRequest;
-    WindowList: TObjectDictionary<HWND, TGameState>;
-    FontTable: array of array of Word;
-    FontMap, FontIndex: array of Word;
-    FontWidth: array of Byte;
-    FontCount: Word;
     CityNames: TStringList;
     CityShortcuts: TStringList;
-    GoodsShortcuts: TStringList;
-    CurrentWindow: HWND;
-    Delay: Integer;
+    ColumnSortAscending: Boolean;
     ColumnSortIndex: Integer;
     ColumnSortWas: Integer;
-    ColumnSortAscending: Boolean;
     ColumnType: Integer;
-    procedure LoadFont;
-    procedure FindCityName(bmp: TBitmap);
-    procedure FindChatMessage(bmp: TBitmap);
-    procedure FindTrade(bmp: TBitmap);
-    procedure WriteLog(msg: String);
-    procedure WriteLogForColor(Bmp: TBitmap; pointX, increaseX, pointY, increaseY: Integer);
-    function FindFlagImage(bmp: TBitmap): Integer;
-    function GetText(bmp: TBitmap; X, Y, Width: Integer; PixelsFunc: TPixelsFunc): String;
-    function GetServer: String;
+    CurrentWindow: HWND;
+    Delay: Integer;
+    FontCount: Word;
+    FontMap, FontIndex: array of Word;
+    FontTable: array of array of Word;
+    FontWidth: array of Byte;
+    GoodsShortcuts: TStringList;
+    Request: TRequest;
+    WindowList: TFPGMapObject<HWND, TGameState>;
+    procedure FindChatMessage(lazImage: TLazIntfImage);
+    procedure FindCityName(lazImage: TLazIntfImage);
+    function FindFlagImage(lazImage: TLazIntfImage): Integer;
+    procedure FindTrade(lazImage: TLazIntfImage);
     function GetPassedTimeString(const PassedTime: Int64): String;
     function GetQuoteStatusString(const QuoteStatus: Int8): String;
     function GetResistStatusString(const ResistStatus: Int8): String;
-    procedure ReadSearchShortcuts(SearchShortcutsPath: String);
+    function GetServer: String;
+    function GetText(lazImage: TLazIntfImage; X, Y, Width: Integer; PixelsFunc: TPixelsFunc): String;
+    procedure LoadFont;
     function NaturalOrderCompareString(const A1, A2: string; ACaseSensitive: Boolean): Integer;
+    procedure ReadSearchShortcuts(SearchShortcutsPath: String);
+    procedure WriteLog(msg: String);
+    procedure WriteLogForColor(lazImage: TLazIntfImage; pointX, increaseX, pointY, increaseY: Integer);
 
   public
     { Public declarations }
@@ -103,7 +103,7 @@ implementation
 uses
   Math, StrUtils, ShellApi, DateUtils, TypInfo;
 
-function GetWhitePoints(bmp: TBitmap; fromX, fromY: Integer): Word;
+function GetBlackPoints(lazImage: TLazIntfImage; fromX, fromY: Integer): Word;
 var
   count: Integer;
   Line: PRGBTriple;
@@ -112,27 +112,7 @@ begin
   result := 0;
   for count := 0 to 14 do
   begin
-    Line := bmp.ScanLine[fromY + count];
-    color := RGB(Line[fromX].rgbtRed, Line[fromX].rgbtGreen, Line[fromX].rgbtBlue);
-    result := result shl 1;
-    if color = clWhite then
-    begin
-      result := result or 1;
-    end;
-  end;
-  result := result shl 1;
-end;
-
-function GetBlackPoints(bmp: TBitmap; fromX, fromY: Integer): Word;
-var
-  count: Integer;
-  Line: PRGBTriple;
-  color: TColor;
-begin
-  result := 0;
-  for count := 0 to 14 do
-  begin
-    Line := bmp.ScanLine[fromY + count];
+    Line := lazImage.GetDataLineStart(fromY + count);
     color := RGB(Line[fromX].rgbtRed, Line[fromX].rgbtGreen, Line[fromX].rgbtBlue);
     result := result shl 1;
     if color = clBlack then
@@ -143,7 +123,7 @@ begin
   result := result shl 1;
 end;
 
-function GetBrightPoints(bmp: TBitmap; fromX, fromY: Integer): Word;
+function GetBrightPoints(lazImage: TLazIntfImage; fromX, fromY: Integer): Word;
 var
   count: Integer;
   Line: PRGBTriple;
@@ -152,7 +132,7 @@ begin
   result := 0;
   for count := 0 to 14 do
   begin
-    Line := bmp.ScanLine[fromY + count];
+    Line := lazImage.GetDataLineStart(fromY + count);
     high := Max(Line[fromX].rgbtRed, Max(Line[fromX].rgbtGreen, Line[fromX].rgbtBlue));
     result := result shl 1;
     if high > 160 then
@@ -162,14 +142,44 @@ begin
   end;
   result := result shl 1;
 end;
-
-function ComparePixelColor(bmp: TBitmap; X, Y: Integer; R, G, B: Byte): Bool;
+function GetWhitePoints(lazImage: TLazIntfImage; fromX, fromY: Integer): Word;
 var
-  chkR, chkG, chkB, count: Integer;
+  count: Integer;
+  Line: PRGBTriple;
+  color: TColor;
+begin
+  result := 0;
+  for count := 0 to 14 do
+  begin
+    Line := lazImage.GetDataLineStart(fromY + count);
+    color := RGB(Line[fromX].rgbtRed, Line[fromX].rgbtGreen, Line[fromX].rgbtBlue);
+    result := result shl 1;
+    if color = clWhite then
+    begin
+      result := result or 1;
+    end;
+  end;
+  result := result shl 1;
+end;
+
+function CompareColor(R1, G1, B1: Byte; R2, G2, B2: Byte): Bool;
+begin
+  result := False;
+  if ABS(Integer(R1) - R2) > 8 then
+     exit;
+  if ABS(Integer(G1) - G2) > 8 then
+     exit;
+  if ABS(Integer(B1) - B2) > 8 then
+     exit;
+  result := True;
+end;
+
+function ComparePixelColor(lazImage: TLazIntfImage; X, Y: Integer; R, G, B: Byte): Bool;
+var
   Line: PRGBTriple;
 begin
   result := False;
-  Line := bmp.ScanLine[Y];
+  Line := lazImage.GetDataLineStart(Y);
   if ABS(Integer(Line[X].rgbtRed) - R) > 8 then
     exit;
   if ABS(Integer(Line[X].rgbtGreen) - G) > 8 then
@@ -196,18 +206,19 @@ begin
   end;
 end;
 
+{ TFormQuote Public ========================================================== }
+
 procedure TFormQuote.FormCreate(Sender: TObject);
 var
   CityNamesPath, FontPath, SearchShortcutsPath: String;
-  Latest, Version, ErrorMessage: String;
+  Latest, Version: String;
   ExeName: string;
-  Size, Handle: DWORD;
+  Size, Dummy: DWORD;
   Buffer: TBytes;
   FixedPtr: PVSFixedFileInfo;
-  Build: Word;
 begin
   CurrentWindow := 0;
-  WindowList := TObjectDictionary<HWND, TGameState>.Create([doOwnsValues]);
+  WindowList := TFPGMapObject<HWND, TGameState>.Create(True);
   MemoLog.Lines.Clear;
   LabelCity.Caption := '';
   //WriteLog('FormCreate');
@@ -218,21 +229,21 @@ begin
 
   if not fileexists(FontPath) then
   begin
-    MessageBox(0, 'Font.dat 파일을 찾을 수 없습니다.', '오류', MB_OK+MB_ICONERROR);
+    MessageBoxW(0, 'Font.dat 파일을 찾을 수 없습니다.', '오류', MB_OK+MB_ICONERROR);
     Application.Terminate;
     exit;
   end;
 
   if not fileexists(CityNamesPath) then
   begin
-    MessageBox(0, 'CityNames.txt 파일을 찾을 수 없습니다.', '오류', MB_OK+MB_ICONERROR);
+    MessageBoxW(0, 'CityNames.txt 파일을 찾을 수 없습니다.', '오류', MB_OK+MB_ICONERROR);
     Application.Terminate;
     exit;
   end;
 
   if not fileexists(SearchShortcutsPath) then
   begin
-    MessageBox(0, 'SearchShortcuts.txt 파일을 찾을 수 없습니다.', '오류', MB_OK+MB_ICONERROR);
+    MessageBoxW(0, 'SearchShortcuts.txt 파일을 찾을 수 없습니다.', '오류', MB_OK+MB_ICONERROR);
     Application.Terminate;
     exit;
   end;
@@ -243,6 +254,11 @@ begin
   CityNames.Sorted := True;
   CityNames.Duplicates := dupIgnore;
   CityNames.LoadFromFile(CityNamesPath);
+  CityNames.Sorted := False;
+  if Copy(CityNames[0], 1, 3) = #$EF#$BB#$BF then
+  begin
+    CityNames[0] := Copy(CityNames[0], 4, Length(CityNames[0]));
+  end;
 
   CityShortcuts := TStringList.Create;
   CityShortcuts.Add('');
@@ -254,18 +270,19 @@ begin
   Request := TRequest.Create;
 
   ExeName := Application.ExeName;
-  Size := GetFileVersionInfoSize(PChar(ExeName), Handle);
+  Dummy := 0;
+  Size := GetFileVersionInfoSize(PChar(ExeName), Dummy);
   if Size = 0 then
     RaiseLastOSError;
   SetLength(Buffer, Size);
-  if not GetFileVersionInfo(PChar(ExeName), Handle, Size, Buffer) then
+  if not GetFileVersionInfo(PChar(ExeName), 0, Size, PByte(Buffer)) then
     RaiseLastOSError;
-  if not VerQueryValue(Buffer, '\', Pointer(FixedPtr), Size) then
+  if not VerQueryValue(PByte(Buffer), '\', Pointer(FixedPtr), Size) then
     RaiseLastOSError;
   Version := Format('%d.%d #%d', [
-    HiWord(FixedPtr.dwProductVersionMS), //Major
-    LoWord(FixedPtr.dwProductVersionMS), //Minor
-    LoWord(FixedPtr.dwFileVersionLS)]); //Build
+    HiWord(FixedPtr^.dwProductVersionMS), //Major
+    LoWord(FixedPtr^.dwProductVersionMS), //Minor
+    LoWord(FixedPtr^.dwFileVersionLS)]); //Build
   Caption := Caption + ' ' + Version;
 
   Latest := Request.GetVersion;
@@ -309,23 +326,108 @@ begin
     Request.Terminate;
 end;
 
-procedure TFormQuote.ButtonResetClick(Sender: TObject);
+procedure TFormQuote.TimerLoopTimer(Sender: TObject);
 var
-  i: Integer;
+  ClassName: string;
+  Handle: HWND;
+  state: TGameState;
+  WindowRect: TRect;
+  //WindowPoint: TPoint;
+  DC: HDC;
+  Bmp: TBitmap;
+  Captured: Boolean;
+  lazImage: TLazIntfImage;
 begin
-  ComboBoxShortcut.ItemIndex := 0;
-  ComboBoxShortcut.Enabled := False;
-  ComboBoxShortcut.Style := csDropDown;
-  ComboBoxShortcut.Style := csDropDownList;
-  ComboBoxShortcut.Enabled := True;
-  EditCities.Text := '';
-  EditGoods.Text := '';
-  ListViewSearch.Clear;
-  if ListViewSearch.Columns.Count > 0 then
+  Handle := GetForegroundWindow;
+  SetLength(ClassName, 255);
+  SetLength(ClassName, GetClassName(Handle, PChar(ClassName), Length(ClassName)));
+
+  if className <> GameClassName then
   begin
-    for i := ListViewSearch.Columns.Count - 1 downto 0 do
-      ListViewSearch.Column[i].Destroy;
+    exit;
   end;
+
+  TimerLoop.Enabled := False;
+  if Handle <> CurrentWindow then
+  begin
+    CurrentWindow := Handle;
+    if WindowList.TryGetData(Handle, state) then
+    begin
+      LabelCity.Caption := '도시명: ' + state.CityName;
+    end else begin
+      WindowList.Add(CurrentWindow, TGameState.Create(CurrentWindow));
+      LabelCity.Caption := '';
+    end;
+  end;
+{
+  WindowPoint.X := 0;
+  WindowPoint.Y := 0;
+  WinApi.Windows.GetClientRect(Handle, WindowRect);
+  Winapi.Windows.ClientToScreen(Handle, WindowPoint);
+  DC := GetWindowDC(GetDesktopWindow);
+  Bmp := TBitmap.Create;
+  Bmp.Height := WindowRect.Height;
+  Bmp.Width := WindowRect.Width;
+  Bmp.PixelFormat := pf24bit;
+  BitBlt(Bmp.Canvas.Handle, 0, 0, WindowRect.Width, WindowRect.Height, DC, WindowPoint.X, WindowPoint.Y, SRCCOPY);
+  ReleaseDC(Handle, DC);
+}
+  Captured := Windows.GetClientRect(Handle, WindowRect);
+  if (not Captured) or (WindowRect.Width < 800) or (WindowRect.Height < 600) then
+  begin
+    //WriteLog('not Captured');
+    exit;
+  end;
+
+  Bmp := TBitmap.Create;
+  Bmp.Height := WindowRect.Height;
+  Bmp.Width := WindowRect.Width;
+  Bmp.PixelFormat := pf24bit;
+  DC := GetDC(Handle);
+  Captured := BitBlt(Bmp.Canvas.Handle, 0, 0, WindowRect.Width, WindowRect.Height, DC, 0, 0, SRCCOPY);
+  ReleaseDC(Handle, DC);
+
+  lazImage := Bmp.CreateIntfImage;
+  Bmp.Free;
+
+  if Captured then
+  begin
+    //WriteLog('FindCityName');
+    FindCityName(lazImage);
+    if (CurrentWindow = Handle) and (WindowList[Handle].CityName <> '') then
+    begin
+      //WriteLog('FindChatMessage');
+      FindChatMessage(lazImage);
+      //WriteLog('FindTrade');
+      FindTrade(lazImage);
+    end;
+    //WriteLog('End');
+  end;
+
+  lazImage.Free;
+  TimerLoop.Enabled := True;
+end;
+
+procedure TFormQuote.ButtonClearClick(Sender: TObject);
+begin
+  CurrentWindow := 0;
+  WindowList.Clear;
+  LabelCity.Caption := '';
+  ComboBoxServer.Enabled := True;
+  ButtonSearch.Enabled := not ComboBoxServer.Enabled;
+  ButtonReset.Enabled := ButtonSearch.Enabled;
+  ComboBoxServer.ItemIndex := 0;
+  TimerLoop.Enabled := False;
+  MemoLog.Lines.Clear;
+  MemoLog.Lines.Add('');
+  MemoLog.Lines.Add('      프로그램 동작을 일시적으로 중지 하였습니다.');
+  MemoLog.Lines.Add('      서버를 선택 하여 주십시오.');
+  MemoLog.Lines.Add('');
+end;
+
+procedure TFormQuote.ButtonWebsiteClick(Sender: TObject);
+begin
+  ShellExecute(0, 'open', 'http://gvonline.ga', nil, nil, SW_SHOWNORMAL);
 end;
 
 procedure TFormQuote.ButtonSearchClick(Sender: TObject);
@@ -336,20 +438,22 @@ const
   ColumnWidthForCommon: array[0..8] of Integer = (   80,     50,     40,         60,            100,      100,       50,        150,            120);
 var
   i, j, ColumnCount: Integer;
-  JSONString, JSONPath, Text: String;
+  JSONString, Text: String;
+  JSONParser: TJSONParser;
   JSONArray: TJSONArray;
   JSONRow: TJSONObject;
-  ColumnNames: Tarray<String>;
-  ColumnWidth: Tarray<Integer>;
+  ColumnNames: Array of String;
+  ColumnWidth: Array of Integer;
 begin
   ColumnType := 0;
   ColumnSortWas := -1;
   ColumnCount := 0;
   JSONString := Request.GetSearchResult(GetServer, EditCities.Text, EditGoods.Text);
-  JSONArray := TJSONObject.ParseJSONValue(JSONString) as TJSONArray;
-  for i := 0 to JSONArray.size - 1 do
+  JSONParser := TJSONParser.Create(JSONString, [joUTF8]);
+  JSONArray := TJSONArray(JSONParser.Parse);
+  for i := 0 to JSONArray.Count - 1 do
   begin
-    JSONRow := JSONArray.Get(i) as TJSONObject;
+    JSONRow := TJSONObject(JSONArray.Items[i]);
     ColumnCount := JSONRow.Count;
     SetLength(ColumnNames, ColumnCount);
     SetLength(ColumnWidth, ColumnCount);
@@ -392,16 +496,16 @@ begin
   end;
 
   ListViewSearch.Items.BeginUpdate;
-  for i := 0 to JSONArray.size - 1 do
+  for i := 0 to JSONArray.Count - 1 do
   begin
     with ListViewSearch.Items.Add do
     begin
       for j := 0 to ColumnCount - 1 do
       begin
-        JSONPath := Format('[%d].%s', [i, ColumnNames[j]]);
-        Text := JSONArray.GetValue<String>(JSONPath);
+        JSONRow := TJSONObject(JSONArray.Items[i]);
+        Text := JSONRow.Get(ColumnNames[j]);
 
-        if EndsStr('갱신시간', ColumnNames[j]) then
+        if AnsiEndsStr('갱신시간', ColumnNames[j]) then
         begin
           if Text = '0' then
             Text := ''
@@ -426,8 +530,7 @@ begin
       end;
       for j := 0 to ColumnCount - 1 do
       begin
-        JSONPath := Format('[%d].%s', [i, ColumnNames[j]]);
-        SubItems.Add(JSONArray.GetValue<String>(JSONPath));
+        SubItems.Add(JSONRow.Get(ColumnNames[j]));
       end;
     end;
   end;
@@ -435,9 +538,23 @@ begin
   ListViewSearch.Items.EndUpdate;
 end;
 
-procedure TFormQuote.ButtonWebsiteClick(Sender: TObject);
+procedure TFormQuote.ButtonResetClick(Sender: TObject);
+var
+  i: Integer;
 begin
-  ShellExecute(0, 'open', 'http://gvonline.ga', nil, nil, SW_SHOWNORMAL);
+  ComboBoxShortcut.ItemIndex := 0;
+  ComboBoxShortcut.Enabled := False;
+  ComboBoxShortcut.Style := csDropDown;
+  ComboBoxShortcut.Style := csDropDownList;
+  ComboBoxShortcut.Enabled := True;
+  EditCities.Text := '';
+  EditGoods.Text := '';
+  ListViewSearch.Clear;
+  if ListViewSearch.Columns.Count > 0 then
+  begin
+    for i := ListViewSearch.Columns.Count - 1 downto 0 do
+      ListViewSearch.Column[i].Destroy;
+  end;
 end;
 
 procedure TFormQuote.ComboBoxServerChange(Sender: TObject);
@@ -454,99 +571,6 @@ begin
   EditGoods.Text := GoodsShortcuts[ComboBoxShortcut.ItemIndex];
 end;
 
-procedure TFormQuote.ButtonClearClick(Sender: TObject);
-begin
-  CurrentWindow := 0;
-  WindowList.Clear;
-  LabelCity.Caption := '';
-  ComboBoxServer.Enabled := True;
-  ButtonSearch.Enabled := not ComboBoxServer.Enabled;
-  ButtonReset.Enabled := ButtonSearch.Enabled;
-  ComboBoxServer.ItemIndex := 0;
-  TimerLoop.Enabled := False;
-  MemoLog.Lines.Clear;
-  MemoLog.Lines.Add('');
-  MemoLog.Lines.Add('      프로그램 동작을 일시적으로 중지 하였습니다.');
-  MemoLog.Lines.Add('      서버를 선택 하여 주십시오.');
-  MemoLog.Lines.Add('');
-end;
-
-procedure TFormQuote.TimerLoopTimer(Sender: TObject);
-var
-  ClassName: string;
-  Handle: HWND;
-  WindowRect: TRect;
-  //WindowPoint: TPoint;
-  DC: HDC;
-  Bmp: TBitmap;
-  Captured: Boolean;
-begin
-  Handle := GetForegroundWindow;
-  SetLength(ClassName, 255);
-  SetLength(ClassName, GetClassName(Handle, PChar(ClassName), Length(ClassName)));
-
-  if className <> GameClassName then
-  begin
-    exit;
-  end;
-
-  TimerLoop.Enabled := False;
-  if Handle <> CurrentWindow then
-  begin
-    CurrentWindow := Handle;
-    if WindowList.ContainsKey(Handle) then
-    begin
-      LabelCity.Caption := '도시명: ' + WindowList[Handle].CityName;
-    end else begin
-      WindowList.Add(CurrentWindow, TGameState.Create(CurrentWindow));
-      LabelCity.Caption := '';
-    end;
-  end;
-{
-  WindowPoint.X := 0;
-  WindowPoint.Y := 0;
-  WinApi.Windows.GetClientRect(Handle, WindowRect);
-  Winapi.Windows.ClientToScreen(Handle, WindowPoint);
-  DC := GetWindowDC(GetDesktopWindow);
-  Bmp := TBitmap.Create;
-  Bmp.Height := WindowRect.Height;
-  Bmp.Width := WindowRect.Width;
-  Bmp.PixelFormat := pf24bit;
-  BitBlt(Bmp.Canvas.Handle, 0, 0, WindowRect.Width, WindowRect.Height, DC, WindowPoint.X, WindowPoint.Y, SRCCOPY);
-  ReleaseDC(Handle, DC);
-}
-  Captured := WinApi.Windows.GetClientRect(Handle, WindowRect);
-  if (not Captured) or (WindowRect.Width < 800) or (WindowRect.Height < 600) then
-  begin
-    exit;
-  end;
-
-  Bmp := TBitmap.Create;
-  Bmp.Height := WindowRect.Height;
-  Bmp.Width := WindowRect.Width;
-  Bmp.PixelFormat := pf24bit;
-  DC := GetDC(Handle);
-  Captured := BitBlt(Bmp.Canvas.Handle, 0, 0, WindowRect.Width, WindowRect.Height, DC, 0, 0, SRCCOPY);
-  ReleaseDC(Handle, DC);
-
-  if Captured then
-  begin
-    //WriteLog('FindCityName');
-    FindCityName(Bmp);
-    if (CurrentWindow = Handle) and (WindowList[Handle].CityName <> '') then
-    begin
-      //WriteLog('FindChatMessage');
-      FindChatMessage(Bmp);
-      //WriteLog('FindTrade');
-      FindTrade(Bmp);
-    end;
-    //WriteLog('End');
-  end;
-
-  Bmp.Free;
-  TimerLoop.Enabled := True;
-end;
-
 procedure TFormQuote.ListViewSearchColumnClick(Sender: TObject; Column: TListColumn);
 begin
   ColumnSortIndex := Column.Index + ListViewSearch.Columns.Count;
@@ -560,30 +584,11 @@ begin
   (Sender as TCustomListView).AlphaSort;
 end;
 
-procedure TFormQuote.ListViewSearchCompare(Sender: TObject; Item1, Item2: TListItem; Data: Integer; var Compare: Integer);
-var
-  i: Integer;
-begin
-  if ColumnSortIndex > 0 then
-  begin
-    i := ColumnSortIndex - 1;
-    Compare := NaturalOrderCompareString(Item1.SubItems[i], Item2.SubItems[i], True);
-  end
-  else
-  begin
-    Compare := NaturalOrderCompareString(Item1.Caption, Item2.Caption, True);
-  end;
-
-  if not ColumnSortAscending then
-    Compare := -Compare;
-end;
-
 procedure TFormQuote.ListViewSearchDblClick(Sender: TObject);
 var
   HitTests: THitTests;
-  HitTest: THitTest;
-  Text, Temp: String;
-  SubItems: TArray<String>;
+  Text: String;
+  SubItems: TStringList;
   i, ColumnX, ClickX : Integer;
   ListViewCursosPos: TPoint;
   SelectedItem: TListItem;
@@ -612,7 +617,8 @@ begin
   if HitTests <= [htOnIcon, htOnItem, htOnLabel, htOnStateIcon] then
   begin
     Text := SelectedItem.Caption;
-    SubItems := SelectedItem.SubItems.ToStringArray;
+    SubItems := TStringList.Create;
+    SubItems.Assign(SelectedItem.SubItems);
   end
   else
     exit;
@@ -652,7 +658,27 @@ begin
       EditGoods.Text := '';
     end;
   end;
+
+  SubItems.Free;
   ButtonSearchClick(nil);
+end;
+
+procedure TFormQuote.ListViewSearchCompare(Sender: TObject; Item1, Item2: TListItem; Data: Integer; var Compare: Integer);
+var
+  i: Integer;
+begin
+  if ColumnSortIndex > 0 then
+  begin
+    i := ColumnSortIndex - 1;
+    Compare := NaturalOrderCompareString(Item1.SubItems[i], Item2.SubItems[i], True);
+  end
+  else
+  begin
+    Compare := NaturalOrderCompareString(Item1.Caption, Item2.Caption, True);
+  end;
+
+  if not ColumnSortAscending then
+    Compare := -Compare;
 end;
 
 procedure TFormQuote.ListViewCustomDrawSubItem(Sender: TCustomListView; Item: TListItem; SubItem: Integer; State: TCustomDrawState; var DefaultDraw: Boolean);
@@ -675,41 +701,57 @@ begin
   Sender.Canvas.Font.Color := clDefault;
 end;
 
-{ PRIVATE }
+{ TFormQuote Private ========================================================= }
 
-procedure TFormQuote.LoadFont;
+procedure TFormQuote.FindChatMessage(lazImage: TLazIntfImage);
 var
-  FontName: String;
-  FontFile: TFileStream;
-  i, ch: Word;
-  width: Byte;
+  State: TGameState;
+  pointX, pointY, limitY, line: Integer;
+  log, status: String;
 begin
-  FontName := ExtractFilePath(Application.ExeName) + 'font.dat';
-  FontFile := TFileStream.Create(FontName, fmOpenRead);
-  FontFile.Read(FontCount, 2);
+  if CurrentWindow = 0 then
+    exit;
 
-  SetLength(FontTable, FontCount, 16);
-  SetLength(FontMap, FontCount);
-  SetLength(FontWidth, FontCount);
-  SetLength(FontIndex, 65536);
-  FillChar(FontIndex[0], SizeOf(Word) * Length(FontIndex), $FF);
-
-  for i := 0 to FontCount - 1 do
+  limitY := lazImage.Height - 32;
+  pointY := limitY - 20 * 5;
+  for line := 0 to 4 do
   begin
-    FontFile.Read(ch, 2);
-    FontFile.Read(width, 1);
-    FontFile.Read(FontTable[i, 0], width * 2);
+    pointX := 12;
+    log := GetText(lazImage, pointX, pointY, 568, @GetBrightPoints);
 
-    FontMap[i] := ch;
-    FontIndex[ch] := i;
-    FontWidth[i] := width;
+    if AnsiStartsStr('교역소주인      ：', log) then
+    begin
+      status := Trim(UTF8Copy(log, 13, UTF8Length(log)));
+    end;
+
+    if AnsiStartsStr('교역소의 도제   ：', log) then
+    begin
+      status := Trim(UTF8Copy(log, 12, UTF8Length(log)));
+    end;
+
+    if AnsiStartsStr('항구관리        ：', log) or
+       AnsiStartsStr('항구안내원      ：', log) or
+       AnsiStartsStr('역장            ：', log) or
+       AnsiStartsStr('마부            ：', log) then
+    begin
+      status := '';
+    end;
+
+    //WriteLog(Trim(log));
+    inc(pointY, 20);
   end;
-  FontFile.Free;
 
-  //WriteLog(Format('load font, font count: %d', [FontCount]));
+  State := WindowList[CurrentWindow];
+  if (status <> '') and (State.CityName <> '') and
+    (State.CityStatus <> (State.CityName + '::' + status)) then
+  begin
+    State.CityStatus := State.CityName + '::' + status;
+    WriteLog(State.CityName + ' 교역소 :: ' + status);
+    Request.SendCityInfo(GetServer, State.CityName, status);
+  end;
 end;
 
-procedure TFormQuote.FindCityName(bmp: TBitmap);
+procedure TFormQuote.FindCityName(lazImage: TLazIntfImage);
 var
   flagX, pointX, pointY, count, step, item, charAt, index, width: Integer;
   ch: Word;
@@ -721,7 +763,7 @@ begin
   if CurrentWindow = 0 then
     exit;
 
-  flagX := FindFlagImage(bmp);
+  flagX := FindFlagImage(lazImage);
 
   if flagX = 0 then
   begin
@@ -752,7 +794,7 @@ begin
     check := True;
     for step := 0 to 15 do
     begin
-      font[step] := getWhitePoints(bmp, pointX + step, pointY);
+      font[step] := getWhitePoints(lazImage, pointX + step, pointY);
       check := check and (font[step] <> $FFFE);
     end;
     if not check then
@@ -816,62 +858,63 @@ begin
   end;
 end;
 
-procedure TFormQuote.FindChatMessage(bmp: TBitmap);
+function TFormQuote.FindFlagImage(lazImage: TLazIntfImage): Integer;
 var
-  State: TGameState;
-  pointX, pointY, limitY, line: Integer;
-  log, status: String;
+  TopLine, BottomLine, VerticalLine: PRGBTriple;
+  TopColor, BottomColor, LeftColor, RightColor: TColor;
+  X, Y, W, Left: Integer;
+  Match: Bool;
 begin
-  if CurrentWindow = 0 then
-    exit;
+  Result := -1;
+  TopLine := lazImage.GetDataLineStart(FlagOffsetY);
+  BottomLine := lazImage.GetDataLineStart(FlagOffsetY + FlagHeight - 1);
+  W := 0;
 
-  limitY := bmp.Height - 32;
-  pointY := limitY - 20 * 5;
-  for line := 0 to 4 do
+  for X := 0 to 299 do
   begin
-    pointX := 12;
-    log := GetText(bmp, pointX, pointY, 568, @GetBrightPoints);
-
-    if StartsStr('교역소주인      ：', log) then
+    TopColor := RGB(TopLine[x].rgbtRed, TopLine[x].rgbtGreen, TopLine[x].rgbtBlue);
+    BottomColor := RGB(BottomLine[x].rgbtRed, BottomLine[x].rgbtGreen, BottomLine[x].rgbtBlue);
+    if (TopColor <> clBlack) or (BottomColor <> clBlack) then
     begin
-      status := Trim(Copy(log, 13, Length(log)));
+      W := 0;
+      continue;
     end;
 
-    if StartsStr('교역소의 도제   ：', log) then
+    inc(W);
+    if W < FlagWidth then
     begin
-      status := Trim(Copy(log, 12, Length(log)));
+      continue;
     end;
 
-    if StartsStr('항구관리        ：', log) or
-       StartsStr('항구안내원      ：', log) or
-       StartsStr('역장            ：', log) or
-       StartsStr('마부            ：', log) then
+    Left := X - FlagWidth + 1;
+    Match := True;
+    for Y := FlagOffsetY + 1 to FlagOffsetY + FlagHeight - 1 do
     begin
-      status := '';
+      VerticalLine := lazImage.GetDataLineStart(Y);
+      LeftColor := RGB(VerticalLine[Left].rgbtRed, VerticalLine[Left].rgbtGreen, VerticalLine[Left].rgbtBlue);
+      RightColor := RGB(VerticalLine[X].rgbtRed, VerticalLine[X].rgbtGreen, VerticalLine[X].rgbtBlue);
+      if (LeftColor <> clBlack) or (RightColor <> clBlack) then
+      begin
+        Match := False;
+        break;
+      end;
     end;
 
-    //WriteLog(Trim(log));
-    inc(pointY, 20);
-  end;
-
-  State := WindowList[CurrentWindow];
-  if (status <> '') and (State.CityName <> '') and
-    (State.CityStatus <> (State.CityName + '::' + status)) then
-  begin
-    State.CityStatus := State.CityName + '::' + status;
-    WriteLog(State.CityName + ' 교역소 :: ' + status);
-    Request.SendCityInfo(GetServer, State.CityName, status);
+    if Match then
+    begin
+      Result := Left;
+      break;
+    end;
   end;
 end;
 
-procedure TFormQuote.FindTrade(bmp: TBitmap);
+procedure TFormQuote.FindTrade(lazImage: TLazIntfImage);
 var
   State: TGameState;
   centerX, centerY, pointX, pointY, limitY, Selected, item, X, Status: Integer;
   Title, Name, Quote, StatusString: String;
   QuoteNum: Integer;
   TopLine, BottomLine: PRGBTriple;
-  TopColor, BottomColor, LineColor: TColor;
   r, g, b: Byte;
   match: Bool;
 begin
@@ -884,17 +927,17 @@ begin
     exit;
   end;
 
-  centerX := bmp.Width div 2;
-  centerY := bmp.Height div 2;
+  centerX := lazImage.Width div 2;
+  centerY := lazImage.Height div 2;
 
   pointX := centerX - 281; // 119;
   pointY := centerY - 223; // 77;
-  Title := Trim(GetText(bmp, pointX, pointY, 50, @GetBlackPoints));
+  Title := Trim(GetText(lazImage, pointX, pointY, 50, @GetBlackPoints));
   if Title <> '소유물품' then
   begin
     pointX := centerX - 226; // 174;
     pointY := centerY - 223; // 77;
-    Title := Trim(GetText(bmp, pointX, pointY, 50, @GetBlackPoints));
+    Title := Trim(GetText(lazImage, pointX, pointY, 50, @GetBlackPoints));
   end;
   if Title <> '소유물품' then
   begin
@@ -910,13 +953,12 @@ begin
 
   while pointY < (limitY - 48) do
   begin
-    TopLine := bmp.ScanLine[pointY];
-    BottomLine := bmp.ScanLine[pointY + 47];
+    TopLine := lazImage.GetDataLineStart(pointY);
+    BottomLine := lazImage.GetDataLineStart(pointY + 47);
     r := TopLine[pointX].rgbtRed;
     g := TopLine[pointX].rgbtGreen;
     b := TopLine[pointX].rgbtBlue;
-    LineColor := RGB(r, g, b);
-    match := ((r shr 2) = (g shr 2)) and ((r shr 2) = (b shr 2)) and (r > 120);
+    match := (abs(r - g) < 8) and (abs(r - b) < 8) and (abs(g - b) < 8) and (r > 120);
 
     if not match then
     begin
@@ -926,9 +968,8 @@ begin
 
     for X := pointX to pointX + 47 do
     begin
-      TopColor := RGB(TopLine[x].rgbtRed, TopLine[x].rgbtGreen, TopLine[x].rgbtBlue);
-      BottomColor := RGB(BottomLine[x].rgbtRed, BottomLine[x].rgbtGreen, BottomLine[x].rgbtBlue);
-      if (TopColor <> LineColor) or (BottomColor <> LineColor) then
+      if not CompareColor(TopLine[x].rgbtRed, TopLine[x].rgbtGreen, TopLine[x].rgbtBlue, r, g, b) or
+         not CompareCOlor(BottomLine[x].rgbtRed, BottomLine[x].rgbtGreen, BottomLine[x].rgbtBlue, r, g, b) then
       begin
         match := False;
         break;
@@ -941,10 +982,10 @@ begin
       continue;
     end;
 
-    Name := Trim(GetText(bmp, pointX + 52, pointY + 6, 180, GetWhitePoints));
+    Name := Trim(GetText(lazImage, pointX + 52, pointY + 6, 180, GetWhitePoints));
     if Name = '호박' then
     begin
-      if ComparePixelColor(bmp, pointX + 16, pointY + 16, 221, 221, 221) then
+      if ComparePixelColor(lazImage, pointX + 16, pointY + 16, 221, 221, 221) then
         Name := '호박(보석)'
       else
         Name := '호박(식료품)';
@@ -956,49 +997,49 @@ begin
       continue;
     end;
 
-    Quote := Trim(GetText(bmp, pointX + 169, pointY + 26, 80, GetWhitePoints));
-    if (Length(Quote) < 4) or (Quote[1] <> '(') or
-      (Copy(Quote, Length(Quote) - 1, 2) <> '％)') then
+    Quote := Trim(GetText(lazImage, pointX + 169, pointY + 26, 80, GetWhitePoints));
+    if (UTF8Length(Quote) < 4) or (Quote[1] <> '(') or
+      (UTF8Copy(Quote, UTF8Length(Quote) - 1, 2) <> '％)') then
     begin
       inc(pointY);
       continue;
     end;
 
-    Quote := Trim(Copy(Quote, 2, Length(Quote) - 3));
+    Quote := Trim(UTF8Copy(Quote, 2, UTF8Length(Quote) - 3));
     if not TryStrToInt(Quote, QuoteNum) then
     begin
       inc(pointY);
       continue;
     end;
 
-    if ComparePixelColor(bmp, pointX + 240, pointY + 27, 8, 8, 8) and
-       ComparePixelColor(bmp, pointX + 229, pointY + 38, 8, 8, 8) then
+    if ComparePixelColor(lazImage, pointX + 240, pointY + 27, 8, 8, 8) and
+       ComparePixelColor(lazImage, pointX + 229, pointY + 38, 8, 8, 8) then
     begin
       Status := 1;
       StatusString := '▲';
     end
     else
-    if ComparePixelColor(bmp, pointX + 240, pointY + 32, 8, 8, 8) and
-       ComparePixelColor(bmp, pointX + 229, pointY + 36, 8, 8, 8) then
+    if ComparePixelColor(lazImage, pointX + 240, pointY + 32, 8, 8, 8) and
+       ComparePixelColor(lazImage, pointX + 229, pointY + 36, 8, 8, 8) then
     begin
       Status := 0;
       StatusString := '';
     end
     else
-    if ComparePixelColor(bmp, pointX + 240, pointY + 40, 8, 8, 8) and
-       ComparePixelColor(bmp, pointX + 229, pointY + 29, 8, 8, 8) then
+    if ComparePixelColor(lazImage, pointX + 240, pointY + 40, 8, 8, 8) and
+       ComparePixelColor(lazImage, pointX + 229, pointY + 29, 8, 8, 8) then
     begin
       Status := -1;
       StatusString := '▼';
     end
     else
     begin
-      WriteLogForColor(bmp, pointX, 240, pointY, 27);
-      WriteLogForColor(bmp, pointX, 229, pointY, 38);
-      WriteLogForColor(bmp, pointX, 240, pointY, 32);
-      WriteLogForColor(bmp, pointX, 229, pointY, 36);
-      WriteLogForColor(bmp, pointX, 240, pointY, 40);
-      WriteLogForColor(bmp, pointX, 229, pointY, 29);
+      WriteLogForColor(lazImage, pointX, 240, pointY, 27);
+      WriteLogForColor(lazImage, pointX, 229, pointY, 38);
+      WriteLogForColor(lazImage, pointX, 240, pointY, 32);
+      WriteLogForColor(lazImage, pointX, 229, pointY, 36);
+      WriteLogForColor(lazImage, pointX, 240, pointY, 40);
+      WriteLogForColor(lazImage, pointX, 229, pointY, 29);
       inc(pointY);
       continue;
     end;
@@ -1037,7 +1078,7 @@ begin
     exit;
   end;
 
-  Title := Trim(GetText(bmp, centerX + TitleOffsetX, centerY + TitleOffsetY, 120, @GetBlackPoints));
+  Title := Trim(GetText(lazImage, centerX + OtherCitiesOffsetX, centerY + OtherCitiesOffsetY, 120, @GetBlackPoints));
   if Title <> '인근 도시 시세' then
     exit;
   //WriteLog('Title: ' + Title);
@@ -1047,13 +1088,12 @@ begin
 
   for item := 0 to 4 do
   begin
-    TopLine := bmp.ScanLine[pointY + item * 56];
-    BottomLine := bmp.ScanLine[pointY + item * 56 + 47];
+    TopLine := lazImage.GetDataLineStart(pointY + item * 56);
+    BottomLine := lazImage.GetDataLineStart(pointY + item * 56 + 47);
     r := TopLine[pointX].rgbtRed;
     g := TopLine[pointX].rgbtGreen;
     b := TopLine[pointX].rgbtBlue;
-    LineColor := RGB(r, g, b);
-    match := ((r shr 2) = (g shr 2)) and ((r shr 2) = (b shr 2)) and (r > 120);
+    match := (abs(r - g) < 8) and (abs(r - b) < 8) and (abs(g - b) < 8) and (r > 120);
 
     if not match then
     begin
@@ -1062,9 +1102,8 @@ begin
 
     for X := pointX to pointX + 47 do
     begin
-      TopColor := RGB(TopLine[x].rgbtRed, TopLine[x].rgbtGreen, TopLine[x].rgbtBlue);
-      BottomColor := RGB(BottomLine[x].rgbtRed, BottomLine[x].rgbtGreen, BottomLine[x].rgbtBlue);
-      if (TopColor <> LineColor) or (BottomColor <> LineColor) then
+      if not CompareColor(TopLine[x].rgbtRed, TopLine[x].rgbtGreen, TopLine[x].rgbtBlue, r, g, b) or
+         not CompareCOlor(BottomLine[x].rgbtRed, BottomLine[x].rgbtGreen, BottomLine[x].rgbtBlue, r, g, b) then
       begin
         match := False;
         break;
@@ -1077,54 +1116,54 @@ begin
       continue;
     end;
 
-    Name := Trim(GetText(bmp, pointX + 52, pointY + item * 56 + 6, 180, GetWhitePoints));
+    Name := Trim(GetText(lazImage, pointX + 52, pointY + item * 56 + 6, 180, GetWhitePoints));
     if (Name = '') or (Name = '???') then
     begin
       //WriteLog(Format('item %d is unknown city', [item]));
       continue;
     end;
 
-    Quote := Trim(GetText(bmp, pointX + 169, pointY + item * 56 + 26, 80, GetWhitePoints));
-    if (Length(Quote) < 4) or (Quote[1] <> '(') or
-      (Copy(Quote, Length(Quote) - 1, 2) <> '％)') then
+    Quote := Trim(GetText(lazImage, pointX + 169, pointY + item * 56 + 26, 80, GetWhitePoints));
+    if (UTF8Length(Quote) < 4) or (Quote[1] <> '(') or
+      (UTF8Copy(Quote, UTF8Length(Quote) - 1, 2) <> '％)') then
     begin
       continue;
     end;
 
-    Quote := Trim(Copy(Quote, 2, Length(Quote) - 3));
+    Quote := Trim(UTF8Copy(Quote, 2, UTF8Length(Quote) - 3));
     if not TryStrToInt(Quote, QuoteNum) then
     begin
       continue;
     end;
 
-    if ComparePixelColor(bmp, pointX + 240, pointY + item * 56 + 27, 8, 8, 8) and
-       ComparePixelColor(bmp, pointX + 229, pointY + item * 56 + 38, 8, 8, 8) then
+    if ComparePixelColor(lazImage, pointX + 240, pointY + item * 56 + 27, 8, 8, 8) and
+       ComparePixelColor(lazImage, pointX + 229, pointY + item * 56 + 38, 8, 8, 8) then
     begin
       Status := 1;
       StatusString := '▲';
     end
     else
-    if ComparePixelColor(bmp, pointX + 240, pointY + item * 56 + 32, 8, 8, 8) and
-       ComparePixelColor(bmp, pointX + 229, pointY + item * 56 + 36, 8, 8, 8) then
+    if ComparePixelColor(lazImage, pointX + 240, pointY + item * 56 + 32, 8, 8, 8) and
+       ComparePixelColor(lazImage, pointX + 229, pointY + item * 56 + 36, 8, 8, 8) then
     begin
       Status := 0;
       StatusString := '';
     end
     else
-    if ComparePixelColor(bmp, pointX + 240, pointY + item * 56 + 40, 8, 8, 8) and
-       ComparePixelColor(bmp, pointX + 229, pointY + item * 56 + 29, 8, 8, 8) then
+    if ComparePixelColor(lazImage, pointX + 240, pointY + item * 56 + 40, 8, 8, 8) and
+       ComparePixelColor(lazImage, pointX + 229, pointY + item * 56 + 29, 8, 8, 8) then
     begin
       Status := -1;
       StatusString := '▼';
     end
     else
     begin
-      WriteLogForColor(bmp, pointX, 240, pointY + item * 56, 27);
-      WriteLogForColor(bmp, pointX, 229, pointY + item * 56, 38);
-      WriteLogForColor(bmp, pointX, 240, pointY + item * 56, 32);
-      WriteLogForColor(bmp, pointX, 229, pointY + item * 56, 36);
-      WriteLogForColor(bmp, pointX, 240, pointY + item * 56, 40);
-      WriteLogForColor(bmp, pointX, 229, pointY + item * 56, 29);
+      WriteLogForColor(lazImage, pointX, 240, pointY + item * 56, 27);
+      WriteLogForColor(lazImage, pointX, 229, pointY + item * 56, 38);
+      WriteLogForColor(lazImage, pointX, 240, pointY + item * 56, 32);
+      WriteLogForColor(lazImage, pointX, 229, pointY + item * 56, 36);
+      WriteLogForColor(lazImage, pointX, 240, pointY + item * 56, 40);
+      WriteLogForColor(lazImage, pointX, 229, pointY + item * 56, 29);
       continue;
     end;
 
@@ -1137,80 +1176,48 @@ begin
   end;
 end;
 
-procedure TFormQuote.WriteLog(msg: String);
-var
-  dateString: String;
+function TFormQuote.GetPassedTimeString(const PassedTime: Int64): String;
 begin
-  dateString := formatdatetime('yyyy/mm/dd hh:mm:ss', Now);
-  MemoLog.Lines.Add(Format('%s - %s', [dateString, msg]));
+  Result := '';
+  if PassedTime <= 0 then
+    exit
+  else if PassedTime < 60 then
+    Result := Format('%d초 전', [PassedTime])
+  else if PassedTime < 3600 then
+    Result := Format('%d분 %d초 전', [Floor(PassedTime div 60), PassedTime mod 60])
+  else
+    Result := Format('%d시간 전', [Floor(PassedTime div 3600)]);
 end;
 
-procedure TFormQuote.WriteLogForColor(Bmp: TBitmap; pointX, increaseX, pointY, increaseY: Integer);
-var
-  VerticalLine: PRGBTriple;
-  X, Y: Integer;
+function TFormQuote.GetQuoteStatusString(const QuoteStatus: Int8): String;
 begin
-  X := pointX + increaseX;
-  Y := pointY + increaseY;
-  VerticalLine := bmp.ScanLine[Y];
-  WriteLog(Format('오류보고 :: 색상불일치 {%d, %d} R %d G %d B %d', [
-    increaseX, increaseY,
-    Integer(VerticalLine[X].rgbtRed),
-    Integer(VerticalLine[X].rgbtGreen),
-    Integer(VerticalLine[X].rgbtBlue)]));
+  Result := '';
+  if QuoteStatus > 0 then
+    Result := '▲'
+  else if QuoteStatus < 0 then
+    Result := '▼';
 end;
 
-function TFormQuote.FindFlagImage(bmp: TBitmap): Integer;
-var
-  TopLine, BottomLine, VerticalLine: PRGBTriple;
-  TopColor, BottomColor, LeftColor, RightColor: TColor;
-  X, Y, W, Left: Integer;
-  Match: Bool;
+function TFormQuote.GetResistStatusString(const ResistStatus: Int8): String;
 begin
-  Result := -1;
-  TopLine := bmp.ScanLine[FlagOffsetY];
-  BottomLine := bmp.ScanLine[FlagOffsetY + FlagHeight - 1];
-  W := 0;
-
-  for X := 0 to 299 do
-  begin
-    TopColor := RGB(TopLine[x].rgbtRed, TopLine[x].rgbtGreen, TopLine[x].rgbtBlue);
-    BottomColor := RGB(BottomLine[x].rgbtRed, BottomLine[x].rgbtGreen, BottomLine[x].rgbtBlue);
-    if (TopColor <> clBlack) or (BottomColor <> clBlack) then
-    begin
-      W := 0;
-      continue;
-    end;
-
-    inc(W);
-    if W < FlagWidth then
-    begin
-      continue;
-    end;
-
-    Left := X - FlagWidth + 1;
-    Match := True;
-    for Y := FlagOffsetY + 1 to FlagOffsetY + FlagHeight - 1 do
-    begin
-      VerticalLine := bmp.ScanLine[Y];
-      LeftColor := RGB(VerticalLine[Left].rgbtRed, VerticalLine[Left].rgbtGreen, VerticalLine[Left].rgbtBlue);
-      RightColor := RGB(VerticalLine[X].rgbtRed, VerticalLine[X].rgbtGreen, VerticalLine[X].rgbtBlue);
-      if (LeftColor <> clBlack) or (RightColor <> clBlack) then
-      begin
-        Match := False;
-        break;
-      end;
-    end;
-
-    if Match then
-    begin
-      Result := Left;
-      break;
-    end;
-  end;
+  Result := '';
+  if ResistStatus = 1 then
+    Result := '★';
 end;
 
-function TFormQuote.GetText(bmp: TBitmap; X: Integer; Y: Integer; Width: Integer; PixelsFunc: TPixelsFunc): String;
+function TFormQuote.GetServer: String;
+begin
+  if ComboBoxServer.ItemIndex = 1 then
+    Result := 'eirene'
+  else if ComboBoxServer.ItemIndex = 2 then
+    Result := 'polaris'
+  else if ComboBoxServer.ItemIndex = 3 then
+    Result := 'helen'
+  else
+    Result := '';
+end;
+
+function TFormQuote.GetText(lazImage: TLazIntfImage; X, Y, Width: Integer; PixelsFunc: TPixelsFunc): String;
 var
   limit, step: Integer;
   a, b, font, index, mid: Word;
@@ -1234,7 +1241,7 @@ begin
     match := True;
     for step := 0 to 15 do
     begin
-      font := PixelsFunc(bmp, X + step, Y);
+      font := PixelsFunc(lazImage, X + step, Y);
       //WriteLog(WordToBinStr(font) + ' - ' + IntToStr(X) + 'bmp');
 
       if font > FontTable[a, step] then
@@ -1296,90 +1303,36 @@ begin
   end;
 end;
 
-function TFormQuote.GetServer: String;
-begin
-  if ComboBoxServer.ItemIndex = 1 then
-    Result := 'eirene'
-  else if ComboBoxServer.ItemIndex = 2 then
-    Result := 'polaris'
-  else if ComboBoxServer.ItemIndex = 3 then
-    Result := 'helen'
-  else
-    Result := '';
-end;
-
-function TFormQuote.GetPassedTimeString(const PassedTime: Int64): String;
-begin
-  Result := '';
-  if PassedTime <= 0 then
-    exit
-  else if PassedTime < 60 then
-    Result := Format('%d초 전', [PassedTime])
-  else if PassedTime < 3600 then
-    Result := Format('%d분 %d초 전', [Floor(PassedTime div 60), PassedTime mod 60])
-  else
-    Result := Format('%d시간 전', [Floor(PassedTime div 3600)]);
-end;
-
-function TFormQuote.GetQuoteStatusString(const QuoteStatus: Int8): String;
-begin
-  Result := '';
-  if QuoteStatus > 0 then
-    Result := '▲'
-  else if QuoteStatus < 0 then
-    Result := '▼';
-end;
-
-function TFormQuote.GetResistStatusString(const ResistStatus: Int8): String;
-begin
-  Result := '';
-  if ResistStatus = 1 then
-    Result := '★';
-end;
-
-procedure TFormQuote.ReadSearchShortcuts(SearchShortcutsPath: String);
+procedure TFormQuote.LoadFont;
 var
-  ReadFile: TStringList;
-  i, Max, PosIndex: Integer;
-  Text: String;
+  FontName: String;
+  FontFile: TFileStream;
+  i, ch: Word;
+  width: Byte;
 begin
-  CityShortcuts.Clear;
-  CityShortcuts.Add('');
-  GoodsShortcuts.Clear;
-  GoodsShortcuts.Add('');
-  ComboBoxShortcut.Items.Clear;
-  ComboBoxShortcut.Items.Add('즐겨찾기');
+  FontName := ExtractFilePath(Application.ExeName) + 'font.dat';
+  FontFile := TFileStream.Create(FontName, fmOpenRead);
+  FontFile.Read(FontCount, 2);
 
-  ReadFile := TStringList.Create;
-  ReadFile.LoadFromFile(SearchShortcutsPath);
-  Max := ReadFile.Count - 1;
-  if Max < 1 then
-    exit;
+  SetLength(FontTable, FontCount, 16);
+  SetLength(FontMap, FontCount);
+  SetLength(FontWidth, FontCount);
+  SetLength(FontIndex, 65536);
+  FillChar(FontIndex[0], SizeOf(Word) * Length(FontIndex), $FF);
 
-  for i := 0 to Max do
+  for i := 0 to FontCount - 1 do
   begin
-    PosIndex := Pos('=', ReadFile[i]);
-    if PosIndex < 1 then
-      continue;
-    ComboBoxShortcut.Items.Add(Trim(Copy(ReadFile[i], 1, (PosIndex - 1))));
-    Text := Trim(Copy(ReadFile[i], (PosIndex + 1), Length(ReadFile[i])));
+    FontFile.Read(ch, 2);
+    FontFile.Read(width, 1);
+    FontFile.Read(FontTable[i, 0], width * 2);
 
-    PosIndex := Pos('+', Text);
-    if PosIndex < 1 then
-    begin
-      CityShortcuts.Add(Text);
-      GoodsShortcuts.Add('');
-      continue;
-    end;
-
-    CityShortcuts.Add(Trim(Copy(Text, 1, (PosIndex - 1))));
-    GoodsShortcuts.Add(Trim(Copy(Text, (PosIndex + 1), Length(Text))));
+    FontMap[i] := ch;
+    FontIndex[ch] := i;
+    FontWidth[i] := width;
   end;
+  FontFile.Free;
 
-  ReadFile.Free;
-
-  ComboBoxShortcut.ItemIndex := 0;
-  ComboBoxShortcut.Enabled := True;
+  //WriteLog(Format('load font, font count: %d', [FontCount]));
 end;
 
 // http://yypbd.tistory.com/590
@@ -1480,6 +1433,79 @@ begin
         Exit;
     end;
   end;
+end;
+
+procedure TFormQuote.ReadSearchShortcuts(SearchShortcutsPath: String);
+var
+  ReadFile: TStringList;
+  i, Max, PosIndex: Integer;
+  Text: String;
+begin
+  CityShortcuts.Clear;
+  CityShortcuts.Add('');
+  GoodsShortcuts.Clear;
+  GoodsShortcuts.Add('');
+  ComboBoxShortcut.Items.Clear;
+  ComboBoxShortcut.Items.Add('즐겨찾기');
+
+  ReadFile := TStringList.Create;
+  ReadFile.LoadFromFile(SearchShortcutsPath);
+  Max := ReadFile.Count - 1;
+  if Max < 1 then
+    exit;
+
+  if Copy(ReadFile[0], 1, 3) = #$EF#$BB#$BF then
+  begin
+    ReadFile[0] := Copy(ReadFile[0], 4, Length(ReadFile[0]));
+  end;
+
+  for i := 0 to Max do
+  begin
+    PosIndex := Pos('=', ReadFile[i]);
+    if PosIndex < 1 then
+      continue;
+    ComboBoxShortcut.Items.Add(Trim(Copy(ReadFile[i], 1, (PosIndex - 1))));
+    Text := Trim(Copy(ReadFile[i], (PosIndex + 1), Length(ReadFile[i])));
+
+    PosIndex := Pos('+', Text);
+    if PosIndex < 1 then
+    begin
+      CityShortcuts.Add(Text);
+      GoodsShortcuts.Add('');
+      continue;
+    end;
+
+    CityShortcuts.Add(Trim(Copy(Text, 1, (PosIndex - 1))));
+    GoodsShortcuts.Add(Trim(Copy(Text, (PosIndex + 1), Length(Text))));
+  end;
+
+  ReadFile.Free;
+
+  ComboBoxShortcut.ItemIndex := 0;
+  ComboBoxShortcut.Enabled := True;
+end;
+
+procedure TFormQuote.WriteLog(msg: String);
+var
+  dateString: String;
+begin
+  dateString := formatdatetime('yyyy/mm/dd hh:mm:ss', Now);
+  MemoLog.Lines.Add(Format('%s - %s', [dateString, msg]));
+end;
+
+procedure TFormQuote.WriteLogForColor(lazImage: TLazIntfImage; pointX, increaseX, pointY, increaseY: Integer);
+var
+  VerticalLine: PRGBTriple;
+  X, Y: Integer;
+begin
+  X := pointX + increaseX;
+  Y := pointY + increaseY;
+  VerticalLine := lazImage.GetDataLineStart(Y);
+  WriteLog(Format('오류보고 :: 색상불일치 {%d, %d} R %d G %d B %d', [
+    increaseX, increaseY,
+    Integer(VerticalLine[X].rgbtRed),
+    Integer(VerticalLine[X].rgbtGreen),
+    Integer(VerticalLine[X].rgbtBlue)]));
 end;
 
 end.

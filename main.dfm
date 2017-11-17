@@ -1,157 +1,158 @@
 object FormQuote: TFormQuote
-  Left = 0
-  Top = 0
+  Left = 390
+  Height = 400
+  Top = 143
+  Width = 500
   BorderIcons = [biSystemMenu, biMinimize]
-  Caption = 'GVOnlineQuoteHelper'
-  ClientHeight = 373
-  ClientWidth = 492
+  Caption = '시세 도우미'
+  ClientHeight = 400
+  ClientWidth = 500
   Color = clBtnFace
   Constraints.MinHeight = 400
   Constraints.MinWidth = 500
-  DoubleBuffered = True
-  Font.Charset = DEFAULT_CHARSET
+  Font.CharSet = ANSI_CHARSET
   Font.Color = clWindowText
-  Font.Height = -11
-  Font.Name = 'Tahoma'
-  Font.Style = []
-  OldCreateOrder = False
+  Font.Height = -12
+  Font.Name = '굴림체'
+  Font.Pitch = fpFixed
+  Font.Quality = fqDraft
   OnCreate = FormCreate
   OnDestroy = FormDestroy
-  DesignSize = (
-    492
-    373)
-  PixelsPerInch = 96
-  TextHeight = 13
+  LCLVersion = '1.6.4.0'
   object LabelCity: TLabel
-    Left = 135
-    Top = 340
-    Width = 57
-    Height = 18
+    Left = 142
+    Height = 12
+    Top = 372
+    Width = 54
     Anchors = [akLeft, akBottom]
     Caption = 'LabelCity'
-    Font.Charset = DEFAULT_CHARSET
+    Font.CharSet = ANSI_CHARSET
     Font.Color = clWindowText
-    Font.Height = -15
-    Font.Name = 'Tahoma'
-    Font.Style = []
+    Font.Height = -12
+    Font.Name = '굴림체'
+    Font.Pitch = fpFixed
+    Font.Quality = fqDraft
+    ParentColor = False
     ParentFont = False
-    ExplicitTop = 267
   end
   object ButtonClear: TButton
-    Left = 409
-    Top = 340
-    Width = 75
+    Left = 417
     Height = 25
+    Top = 367
+    Width = 75
     Anchors = [akRight, akBottom]
-    Caption = #51473#51648
-    TabOrder = 0
+    Caption = '중지'
     OnClick = ButtonClearClick
+    TabOrder = 0
   end
   object ButtonWebsite: TButton
-    Left = 328
-    Top = 340
-    Width = 75
+    Left = 336
     Height = 25
+    Top = 367
+    Width = 75
     Anchors = [akRight, akBottom]
     Caption = 'Website'
-    TabOrder = 1
     OnClick = ButtonWebsiteClick
+    TabOrder = 1
   end
   object ComboBoxServer: TComboBox
     Left = 8
-    Top = 340
-    Width = 121
-    Height = 21
-    Style = csDropDownList
+    Height = 20
+    Top = 368
+    Width = 129
     Anchors = [akLeft, akBottom]
+    ItemHeight = 12
     ItemIndex = 0
-    TabOrder = 2
-    Text = #49436#48260#47484' '#49440#53469#54616#49464#50836
-    OnChange = ComboBoxServerChange
     Items.Strings = (
-      #49436#48260#47484' '#49440#53469#54616#49464#50836
-      #50640#51060#47112#45348
-      #54260#46972#47532#49828
-      #54764#47112#45348)
+      '서버를 선택하세요'
+      '에이레네'
+      '폴라리스'
+      '헬레네'
+    )
+    OnChange = ComboBoxServerChange
+    Style = csDropDownList
+    TabOrder = 2
+    Text = '서버를 선택하세요'
   end
   object PageControl1: TPageControl
     Left = 8
+    Height = 353
     Top = 8
-    Width = 476
-    Height = 326
+    Width = 484
     ActivePage = TabSheet1
-    Anchors = [akLeft, akTop, akRight, akBottom]
+    Anchors = [akTop, akLeft, akRight, akBottom]
+    TabIndex = 0
     TabOrder = 3
     object TabSheet1: TTabSheet
-      Caption = #49688#51665#44592
-      DesignSize = (
-        468
-        298)
+      Caption = '수집기'
+      ClientHeight = 327
+      ClientWidth = 476
       object MemoLog: TMemo
         Left = 3
+        Height = 317
         Top = 3
-        Width = 462
-        Height = 292
-        Anchors = [akLeft, akTop, akRight, akBottom]
+        Width = 469
+        Anchors = [akTop, akLeft, akRight, akBottom]
         ReadOnly = True
         ScrollBars = ssVertical
         TabOrder = 0
       end
     end
     object TabSheet2: TTabSheet
-      Caption = #44160#49353
+      Caption = '검색'
+      ClientHeight = 327
+      ClientWidth = 476
       ImageIndex = 1
-      DesignSize = (
-        468
-        298)
       object LabelCities: TLabel
         Left = 8
+        Height = 12
         Top = 8
-        Width = 33
-        Height = 13
-        Caption = #46020#49884#47749
+        Width = 36
+        Caption = '도시명'
+        ParentColor = False
       end
       object LabelGoods: TLabel
         Left = 8
+        Height = 12
         Top = 39
-        Width = 33
-        Height = 13
-        Caption = #44368#50669#54408
+        Width = 36
+        Caption = '교역품'
+        ParentColor = False
       end
       object ButtonSearch: TButton
         Left = 392
+        Height = 25
         Top = 3
         Width = 75
-        Height = 25
         Anchors = [akTop, akRight]
-        Caption = #44160#49353
+        Caption = '검색'
         Default = True
         Enabled = False
-        TabOrder = 0
         OnClick = ButtonSearchClick
+        TabOrder = 0
       end
       object EditCities: TEdit
         Left = 54
+        Height = 20
         Top = 5
         Width = 236
-        Height = 21
-        Anchors = [akLeft, akTop, akRight]
+        Anchors = [akTop, akLeft, akRight]
         TabOrder = 1
       end
       object EditGoods: TEdit
         Left = 54
+        Height = 20
         Top = 36
         Width = 332
-        Height = 21
-        Anchors = [akLeft, akTop, akRight]
+        Anchors = [akTop, akLeft, akRight]
         TabOrder = 2
       end
       object ListViewSearch: TListView
         Left = 3
+        Height = 257
         Top = 65
-        Width = 464
-        Height = 232
-        Anchors = [akLeft, akTop, akRight, akBottom]
+        Width = 469
+        Anchors = [akTop, akLeft, akRight, akBottom]
         Columns = <>
         ReadOnly = True
         RowSelect = True
@@ -164,29 +165,31 @@ object FormQuote: TFormQuote
       end
       object ButtonReset: TButton
         Left = 392
+        Height = 25
         Top = 34
         Width = 75
-        Height = 25
         Anchors = [akTop, akRight]
-        Caption = #52488#44592#54868
+        Caption = '초기화'
         Enabled = False
-        TabOrder = 4
         OnClick = ButtonResetClick
+        TabOrder = 4
       end
       object ComboBoxShortcut: TComboBox
         Left = 296
+        Height = 20
         Top = 5
         Width = 90
-        Height = 21
-        Style = csDropDownList
         Anchors = [akTop, akRight]
         Enabled = False
+        ItemHeight = 12
         ItemIndex = 0
-        TabOrder = 5
-        Text = #51600#44200#52286#44592
-        OnChange = ComboBoxShortcutChange
         Items.Strings = (
-          #51600#44200#52286#44592)
+          '즐겨찾기'
+        )
+        OnChange = ComboBoxShortcutChange
+        Style = csDropDownList
+        TabOrder = 5
+        Text = '즐겨찾기'
       end
     end
   end
@@ -194,7 +197,7 @@ object FormQuote: TFormQuote
     Enabled = False
     Interval = 250
     OnTimer = TimerLoopTimer
-    Left = 280
-    Top = 336
+    left = 232
+    top = 344
   end
 end

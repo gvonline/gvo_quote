@@ -1,10 +1,7 @@
 program GVOnlineQuoteHelper;
 
-
-
 uses
-  Vcl.Forms,
-  Windows,
+  Interfaces, Forms, Windows,
   main in 'main.pas' {FormQuote},
   gamestate in 'gamestate.pas',
   request in 'request.pas';
@@ -17,7 +14,6 @@ begin
     exit;
 
   Application.Initialize;
-  Application.MainFormOnTaskbar := True;
   Application.CreateForm(TFormQuote, FormQuote);
   Application.Run;
 end.
