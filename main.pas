@@ -6,7 +6,7 @@ uses
   Windows, Messages, SysUtils, Variants, Classes,
   Graphics, Controls, Forms, Dialogs, StdCtrls, ExtCtrls,
   GameState, Request, ComCtrls,
-  lazutf8, fgl, fpjson, jsonparser, jsonscanner, IntfGraphics;
+  lazutf8, fgl, fpjson, jsonparser, jsonscanner, IntfGraphics, Menus;
 
 type
   TPixelsFunc = function(lazImage: TLazIntfImage; X, Y: Integer): Word;
@@ -14,9 +14,9 @@ type
   { TFormQuote }
 
   TFormQuote = class(TForm)
-    ButtonClear: TButton;
     ButtonReset: TButton;
     ButtonSearch: TButton;
+    ButtonStop: TButton;
     ButtonWebsite: TButton;
     ComboBoxServer: TComboBox;
     ComboBoxShortcut: TComboBox;
@@ -27,17 +27,22 @@ type
     LabelGoods: TLabel;
     ListViewSearch: TListView;
     MemoLog: TMemo;
+    MenuItemTrayQuit: TMenuItem;
     PageControl1: TPageControl;
+    PopupMenuTrayIcon: TPopupMenu;
     TabSheet1: TTabSheet;
     TabSheet2: TTabSheet;
     TimerLoop: TTimer;
+    TrayIcon: TTrayIcon;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
+    procedure FormWindowStateChange(Sender: TObject);
     procedure TimerLoopTimer(Sender: TObject);
-    procedure ButtonClearClick(Sender: TObject);
+    procedure ButtonStopClick(Sender: TObject);
     procedure ButtonWebsiteClick(Sender: TObject);
     procedure ButtonSearchClick(Sender: TObject);
     procedure ButtonResetClick(Sender: TObject);
+    procedure MenuItemTrayQuitClick(Sender: TObject);
     procedure ComboBoxServerChange(Sender: TObject);
     procedure ComboBoxShortcutChange(Sender: TObject);
     procedure ListViewSearchColumnClick(Sender: TObject; Column: TListColumn);
@@ -46,6 +51,8 @@ type
     procedure ListViewCustomDrawSubItem(Sender: TCustomListView; Item: TListItem; SubItem: Integer; State: TCustomDrawState; var DefaultDraw: Boolean);
   const
     GameClassName = 'Greate Voyages Online Game MainFrame';
+    WorldTitleOffsetX = -16;
+    WorldTitleOffsetY = -210;
     OtherCitiesOffsetX = 113;
     OtherCitiesOffsetY = -223;
     ConferenceOffsetX = 8;
@@ -56,6 +63,7 @@ type
     FlagOffsetY = 8;
     FlagWidth = 24;
     FlagHeight = 16;
+  procedure TrayIconClick(Sender: TObject);
   private
     { Private declarations }
     CityNames: TStringList;
@@ -77,6 +85,7 @@ type
     procedure FindCityName(lazImage: TLazIntfImage);
     function FindFlagImage(lazImage: TLazIntfImage): Integer;
     procedure FindTrade(lazImage: TLazIntfImage);
+    function FindWorldTitle(lazImage: TLazIntfImage): Boolean;
     function GetPassedTimeString(const PassedTime: Int64): String;
     function GetQuoteStatusString(const QuoteStatus: Int8): String;
     function GetResistStatusString(const ResistStatus: Int8): String;
@@ -84,8 +93,9 @@ type
     function GetText(lazImage: TLazIntfImage; X, Y, Width: Integer; PixelsFunc: TPixelsFunc): String;
     procedure LoadFont;
     function NaturalOrderCompareString(const A1, A2: string; ACaseSensitive: Boolean): Integer;
+    procedure NotificationTray(Title, Message: String);
     procedure ReadSearchShortcuts(SearchShortcutsPath: String);
-    procedure WriteLog(msg: String);
+    procedure WriteLog(Msg: String);
     procedure WriteLogForColor(lazImage: TLazIntfImage; pointX, increaseX, pointY, increaseY: Integer);
 
   public
@@ -162,7 +172,7 @@ begin
   result := result shl 1;
 end;
 
-function CompareColor(R1, G1, B1: Byte; R2, G2, B2: Byte): Bool;
+function CompareColor(R1, G1, B1: Byte; R2, G2, B2: Byte): Boolean;
 begin
   result := False;
   if ABS(Integer(R1) - R2) > 8 then
@@ -174,7 +184,7 @@ begin
   result := True;
 end;
 
-function ComparePixelColor(lazImage: TLazIntfImage; X, Y: Integer; R, G, B: Byte): Bool;
+function ComparePixelColor(lazImage: TLazIntfImage; X, Y: Integer; R, G, B: Byte): Boolean;
 var
   Line: PRGBTriple;
 begin
@@ -284,6 +294,7 @@ begin
     LoWord(FixedPtr^.dwProductVersionMS), //Minor
     LoWord(FixedPtr^.dwFileVersionLS)]); //Build
   Caption := Caption + ' ' + Version;
+  TrayIcon.Hint := Caption;
 
   Latest := Request.GetVersion;
   if Latest = '' then
@@ -300,7 +311,7 @@ begin
     MemoLog.Lines.Add('      웹사이트에서 다운받으세요.');
     MemoLog.Lines.Add('');
     ComboBoxServer.Enabled := False;
-    ButtonClear.Enabled := False;
+    ButtonStop.Enabled := False;
   end
   else
   begin
@@ -324,6 +335,13 @@ begin
     FreeAndNil(GoodsShortcuts);
   if Assigned(Request) then
     Request.Terminate;
+end;
+
+procedure TFormQuote.FormWindowStateChange(Sender: TObject);
+begin
+  case WindowState of
+    wsMinimized: Hide;
+  end;
 end;
 
 procedure TFormQuote.TimerLoopTimer(Sender: TObject);
@@ -387,11 +405,19 @@ begin
   Captured := BitBlt(Bmp.Canvas.Handle, 0, 0, WindowRect.Width, WindowRect.Height, DC, 0, 0, SRCCOPY);
   ReleaseDC(Handle, DC);
 
-  lazImage := Bmp.CreateIntfImage;
-  Bmp.Free;
-
   if Captured then
   begin
+    lazImage := Bmp.CreateIntfImage;
+    if FindWorldTitle(lazImage) then
+    begin
+      lazImage.Free;
+      Bmp.Free;
+      TimerLoop.Enabled := False;
+      Self.ButtonStopClick(nil);
+      exit;
+    end;
+
+
     //WriteLog('FindCityName');
     FindCityName(lazImage);
     if (CurrentWindow = Handle) and (WindowList[Handle].CityName <> '') then
@@ -405,10 +431,11 @@ begin
   end;
 
   lazImage.Free;
+  Bmp.Free;
   TimerLoop.Enabled := True;
 end;
 
-procedure TFormQuote.ButtonClearClick(Sender: TObject);
+procedure TFormQuote.ButtonStopClick(Sender: TObject);
 begin
   CurrentWindow := 0;
   WindowList.Clear;
@@ -423,6 +450,7 @@ begin
   MemoLog.Lines.Add('      프로그램 동작을 일시적으로 중지 하였습니다.');
   MemoLog.Lines.Add('      서버를 선택 하여 주십시오.');
   MemoLog.Lines.Add('');
+  NotificationTray(Caption, '프로그램 동작을 일시적으로 중지 하였습니다.' + #13#10 + '서버를 선택 하여 주십시오.')
 end;
 
 procedure TFormQuote.ButtonWebsiteClick(Sender: TObject);
@@ -555,6 +583,11 @@ begin
     for i := ListViewSearch.Columns.Count - 1 downto 0 do
       ListViewSearch.Column[i].Destroy;
   end;
+end;
+
+procedure TFormQuote.MenuItemTrayQuitClick(Sender: TObject);
+begin
+  Application.Terminate;
 end;
 
 procedure TFormQuote.ComboBoxServerChange(Sender: TObject);
@@ -701,6 +734,14 @@ begin
   Sender.Canvas.Font.Color := clDefault;
 end;
 
+procedure TFormQuote.TrayIconClick(Sender: TObject);
+begin
+  if WindowState = wsMinimized then begin
+    WindowState := wsNormal;
+    Show;
+  end;
+end;
+
 { TFormQuote Private ========================================================= }
 
 procedure TFormQuote.FindChatMessage(lazImage: TLazIntfImage);
@@ -755,10 +796,10 @@ procedure TFormQuote.FindCityName(lazImage: TLazIntfImage);
 var
   flagX, pointX, pointY, count, step, item, charAt, index, width: Integer;
   ch: Word;
-  fail: array of Bool;
+  fail: array of Boolean;
   font: array[0..15] of Word;
   city: WideString;
-  check: Bool;
+  check: Boolean;
 begin
   if CurrentWindow = 0 then
     exit;
@@ -786,7 +827,7 @@ begin
 
   count := CityNames.Count;
   SetLength(fail, count);
-  FillChar(fail[0], SizeOf(Bool) * Length(fail), 0);
+  FillChar(fail[0], SizeOf(Boolean) * Length(fail), 0);
   charAt := 0;
 
   while count > 1 do
@@ -863,7 +904,7 @@ var
   TopLine, BottomLine, VerticalLine: PRGBTriple;
   TopColor, BottomColor, LeftColor, RightColor: TColor;
   X, Y, W, Left: Integer;
-  Match: Bool;
+  Match: Boolean;
 begin
   Result := -1;
   TopLine := lazImage.GetDataLineStart(FlagOffsetY);
@@ -916,7 +957,7 @@ var
   QuoteNum: Integer;
   TopLine, BottomLine: PRGBTriple;
   r, g, b: Byte;
-  match: Bool;
+  match: Boolean;
 begin
   if CurrentWindow = 0 then
     exit;
@@ -1176,6 +1217,25 @@ begin
   end;
 end;
 
+
+function TFormQuote.FindWorldTitle(lazImage: TLazIntfImage): Boolean;
+var
+  centerX, centerY, pointX, pointY: Integer;
+  Title: String;
+begin
+  if CurrentWindow = 0 then
+    exit;
+
+  centerX := lazImage.Width div 2;
+  centerY := lazImage.Height div 2;
+
+  pointX := centerX + WorldTitleOffsetX;
+  pointY := centerY + WorldTitleOffsetY;
+
+  Title := Trim(GetText(lazImage, pointX, pointY, 80, @GetBlackPoints));
+  result := (Title = '월드');
+end;
+
 function TFormQuote.GetPassedTimeString(const PassedTime: Int64): String;
 begin
   Result := '';
@@ -1221,7 +1281,7 @@ function TFormQuote.GetText(lazImage: TLazIntfImage; X, Y, Width: Integer; Pixel
 var
   limit, step: Integer;
   a, b, font, index, mid: Word;
-  match: Bool;
+  match: Boolean;
 begin
   Result := '';
   {
@@ -1435,6 +1495,14 @@ begin
   end;
 end;
 
+
+procedure TFormQuote.NotificationTray(Title, Message: String);
+begin
+  TrayIcon.BalloonTitle := Title;
+  TrayIcon.BalloonHint := Message;
+  TrayIcon.ShowBalloonHint;
+end;
+
 procedure TFormQuote.ReadSearchShortcuts(SearchShortcutsPath: String);
 var
   ReadFile: TStringList;
@@ -1485,12 +1553,12 @@ begin
   ComboBoxShortcut.Enabled := True;
 end;
 
-procedure TFormQuote.WriteLog(msg: String);
+procedure TFormQuote.WriteLog(Msg: String);
 var
   dateString: String;
 begin
   dateString := formatdatetime('yyyy/mm/dd hh:mm:ss', Now);
-  MemoLog.Lines.Add(Format('%s - %s', [dateString, msg]));
+  MemoLog.Lines.Add(Format('%s - %s', [dateString, Msg]));
 end;
 
 procedure TFormQuote.WriteLogForColor(lazImage: TLazIntfImage; pointX, increaseX, pointY, increaseY: Integer);
